@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity, Users, AlertTriangle, ShieldCheck, FileText, UserPlus, LogOut, Search, Filter, Download, ArrowRight, HeartPulse, Building2, Server, Briefcase, Calendar, Database, Stethoscope, Headset, CheckCircle2, Clock, BookOpen, Lock, X, Phone, MessageSquare, MapPin, ExternalLink, ChevronRight, BookMarked, GitBranch, LayoutTemplate } from 'lucide-react';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { generatePatientReportPDF } from './utils/pdfGenerator';
@@ -428,6 +428,8 @@ const allRoles = [
   { id: 'helpdesk', name: 'Helpdesk & Support Officer', group: 'Implementation Team' }
 ];
 
+const DEMO_ACCESS_CODE = 'MOH-TB-2026';
+
 function App() {
   const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'about' | 'docs'>('landing');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -438,6 +440,25 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [patients, setPatients] = useState(initialPatients);
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
+  // Access code gate
+  const [accessGranted, setAccessGranted] = useState(() => sessionStorage.getItem('tb_access') === 'granted');
+  const [accessInput, setAccessInput] = useState('');
+  const [accessError, setAccessError] = useState('');
+  const [codeShake, setCodeShake] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+
+  const handleAccessSubmit = () => {
+    if (accessInput.trim().toUpperCase() === DEMO_ACCESS_CODE.toUpperCase()) {
+      sessionStorage.setItem('tb_access', 'granted');
+      setAccessGranted(true);
+      setAccessError('');
+    } else {
+      setAccessError('Incorrect access code. Please try again.');
+      setCodeShake(true);
+      setAccessInput('');
+      setTimeout(() => setCodeShake(false), 600);
+    }
+  };
 
   const handleRegisterPatient = (newPatient: any) => {
     setPatients([newPatient, ...patients]);
@@ -842,7 +863,122 @@ function App() {
     );
   }
 
+  // ── ACCESS CODE GATE ──────────────────────────────────────────────────────
+  if (!accessGranted) {
+    return (
+      <div className="min-h-screen font-sans flex flex-col items-center justify-center relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f2d1f 100%)' }}>
+
+        {/* Animated background orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay:'1s'}} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-900/20 rounded-full blur-3xl" />
+        </div>
+
+        {/* Card */}
+        <div className="relative z-10 w-full max-w-md mx-4">
+          {/* MoH Logo + Title */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center h-20 w-20 bg-white rounded-2xl shadow-2xl mb-4 mx-auto">
+              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-16 w-16 object-contain rounded-xl" />
+            </div>
+            <h1 className="text-2xl font-black text-white tracking-tight">TB e-Tracker</h1>
+            <p className="text-blue-300 text-sm mt-1">Ministry of Health · Republic of Liberia</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="h-1.5 w-1.5 bg-teal-400 rounded-full animate-pulse"></span>
+              <span className="text-teal-400 text-xs font-bold uppercase tracking-wider">Secure Demo Portal</span>
+            </div>
+          </div>
+
+          {/* Code entry card */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center h-12 w-12 bg-blue-500/20 border border-blue-400/30 rounded-2xl mb-3">
+                <svg className="h-6 w-6 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h2 className="text-white font-bold text-lg">Enter Demo Access Code</h2>
+              <p className="text-blue-200/70 text-sm mt-1">This portal is restricted to authorized evaluators and stakeholders</p>
+            </div>
+
+            {/* Input */}
+            <div className={`transition-all duration-150 ${codeShake ? 'animate-[shake_0.4s_ease-in-out]' : ''}`}
+              style={ codeShake ? { animation: 'shake 0.4s ease-in-out' } : {}}>
+              <div className="relative">
+                <input
+                  type={showCode ? 'text' : 'password'}
+                  value={accessInput}
+                  onChange={e => { setAccessInput(e.target.value.toUpperCase()); setAccessError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleAccessSubmit()}
+                  placeholder="e.g. MOH-TB-2026"
+                  autoFocus
+                  className={`w-full bg-white/10 border rounded-xl px-4 py-3.5 text-white placeholder-white/30 font-mono text-lg tracking-widest text-center outline-none focus:ring-2 transition-all ${
+                    accessError ? 'border-red-400 focus:ring-red-400/50' : 'border-white/20 focus:ring-blue-400/50 focus:border-blue-400/50'
+                  }`}
+                />
+                <button
+                  onClick={() => setShowCode(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showCode ? (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  )}
+                </button>
+              </div>
+
+              {accessError && (
+                <div className="flex items-center gap-2 mt-2 text-red-400 text-sm">
+                  <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  {accessError}
+                </div>
+              )}
+            </div>
+
+            {/* Submit button */}
+            <button
+              onClick={handleAccessSubmit}
+              disabled={!accessInput.trim()}
+              className="mt-5 w-full bg-gradient-to-r from-[#1e3a5f] to-[#138275] hover:from-[#2c5282] hover:to-[#0d9488] text-white font-bold py-3.5 rounded-xl transition-all shadow-lg hover:shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              Access Demo System →
+            </button>
+
+            {/* Help text */}
+            <p className="text-center text-white/30 text-xs mt-4">
+              Don't have a code? Contact{' '}
+              <a href="mailto:tis@totaggroup.com" className="text-blue-300 hover:text-blue-200 underline">tis@totaggroup.com</a>
+            </p>
+          </div>
+
+          {/* Footer */}
+          <p className="text-center text-white/20 text-xs mt-6">
+            National TB e-Tracker · HMIS Unit · MoH Liberia · v2.0
+          </p>
+        </div>
+
+        {/* Shake keyframe injected inline */}
+        <style>{`
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            15% { transform: translateX(-8px); }
+            30% { transform: translateX(8px); }
+            45% { transform: translateX(-6px); }
+            60% { transform: translateX(6px); }
+            75% { transform: translateX(-4px); }
+            90% { transform: translateX(4px); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   if (view === 'landing') {
+
     return (
       <div className="min-h-screen bg-neutral-50 font-sans flex flex-col">
         {renderPublicHeader()}
