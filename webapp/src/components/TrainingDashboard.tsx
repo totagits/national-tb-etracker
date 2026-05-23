@@ -105,6 +105,28 @@ const MaterialsTab = () => {
   const [form, setForm] = useState({ title:'', category:'SOP', language:'English', description:'' });
   const [previewVideo, setPreviewVideo] = useState<typeof MATERIALS[0] | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [_uploadDone, setUploadDone] = useState(false);
+  const inputRef = { current: null as HTMLInputElement | null };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) setUploadedFile(file);
+  };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setUploadedFile(file);
+  };
+  const handleUploadSubmit = () => {
+    setShowUpload(false);
+    setUploadDone(true);
+    setForm({ title:'', category:'SOP', language:'English', description:'' });
+    setUploadedFile(null);
+    setTimeout(() => setUploadDone(false), 4000);
+  };
 
   const VIDEO_THUMBS: Record<string, string> = {
     'MAT-005': '/assets/vid_intro.png',
@@ -310,20 +332,64 @@ const MaterialsTab = () => {
               </div>
               <div>
                 <label className="text-xs font-bold text-neutral-600 block mb-1">File Upload</label>
-                <div className="border-2 border-dashed border-neutral-300 rounded-xl p-8 text-center bg-neutral-50 hover:border-health-blue cursor-pointer">
-                  <Upload className="h-8 w-8 text-neutral-400 mx-auto mb-2"/>
-                  <p className="text-sm text-neutral-500">Click to browse or drag & drop</p>
-                  <p className="text-xs text-neutral-400 mt-1">PDF, DOCX, MP4, PPTX up to 500MB</p>
-                </div>
+                {/* Hidden real file input */}
+                <input
+                  ref={el => { inputRef.current = el; }}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.mov,.avi"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                {uploadedFile ? (
+                  <div className="border-2 border-green-400 bg-green-50 rounded-xl p-4 flex items-center gap-3">
+                    <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Upload className="h-5 w-5 text-green-600"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-green-800 truncate">{uploadedFile.name}</p>
+                      <p className="text-xs text-green-600">{(uploadedFile.size / (1024*1024)).toFixed(2)} MB · Ready to upload</p>
+                    </div>
+                    <button
+                      onClick={() => { setUploadedFile(null); if (inputRef.current) inputRef.current.value = ''; }}
+                      className="text-red-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 flex-shrink-0"
+                      title="Remove file"
+                    >
+                      <X className="h-4 w-4"/>
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                      isDragging
+                        ? 'border-health-blue bg-blue-50 scale-[1.01]'
+                        : 'border-neutral-300 bg-neutral-50 hover:border-health-blue hover:bg-blue-50'
+                    }`}
+                    onClick={() => inputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleFileDrop}
+                  >
+                    <Upload className={`h-8 w-8 mx-auto mb-2 ${isDragging ? 'text-health-blue' : 'text-neutral-400'}`}/>
+                    <p className={`text-sm font-medium ${isDragging ? 'text-health-blue' : 'text-neutral-500'}`}>
+                      {isDragging ? 'Drop your file here!' : 'Click to browse or drag & drop'}
+                    </p>
+                    <p className="text-xs text-neutral-400 mt-1">PDF, DOCX, MP4, PPTX up to 500MB</p>
+                  </div>
+                )}
               </div>
               <div><label className="text-xs font-bold text-neutral-600 block mb-1">Description</label>
                 <textarea value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))} rows={3} placeholder="Brief description of the material and who it is for" className="w-full border border-neutral-300 rounded-lg p-2.5 text-sm outline-none"/>
               </div>
             </div>
             <div className="bg-neutral-50 p-4 border-t flex justify-end gap-3 rounded-b-2xl">
-              <button onClick={()=>setShowUpload(false)} className="px-4 py-2 text-neutral-600 hover:bg-neutral-200 rounded-lg font-medium">Cancel</button>
-              <button onClick={()=>{setShowUpload(false);(window as any).showToast('Material uploaded successfully to the library.');}} disabled={!form.title}
-                className="bg-health-blue text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-800 disabled:opacity-60">Upload</button>
+              <button onClick={()=>{ setShowUpload(false); setUploadedFile(null); }} className="px-4 py-2 text-neutral-600 hover:bg-neutral-200 rounded-lg font-medium">Cancel</button>
+              <button
+                onClick={handleUploadSubmit}
+                disabled={!form.title || !uploadedFile}
+                className="bg-health-blue text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4"/> Upload Material
+              </button>
             </div>
           </div>
         </div>
