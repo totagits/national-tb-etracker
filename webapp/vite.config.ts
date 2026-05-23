@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-192.png', 'pwa-512.png', 'apple-touch-icon.png', 'assets/**/*'],
       manifest: {
-        name: 'TB e-Tracker — Liberia National HMIS',
+        name: 'TB e-Tracker - Liberia National HMIS',
         short_name: 'TB e-Tracker',
         description: 'Liberia National Tuberculosis e-Tracker built on DHIS2. Real-time TB surveillance, patient tracking, and treatment outcome monitoring across all 15 counties.',
         theme_color: '#1e3a5f',
@@ -26,7 +26,7 @@ export default defineConfig({
             src: 'pwa-192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any',
+            purpose: 'any maskable',
           },
           {
             src: 'pwa-512.png',
@@ -42,6 +42,13 @@ export default defineConfig({
             type: 'image/png',
             form_factor: 'wide',
             label: 'TB e-Tracker National Dashboard',
+          },
+          {
+            src: 'assets/tb_exterior.png',
+            sizes: '390x844',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'TB e-Tracker on Mobile',
           },
         ],
       },

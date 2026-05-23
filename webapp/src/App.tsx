@@ -11,7 +11,7 @@ import { HelpdeskDashboard } from './components/HelpdeskDashboard';
 import { NationalAdminDashboard } from './components/NationalAdminDashboard';
 import { ProgramIndicatorsDashboard } from './components/ProgramIndicatorsDashboard';
 import { RegistrationWizard } from './components/RegistrationWizard';
-import { PWAInstallBanner, PWAUpdateToast, PWAInstallButton } from './components/PWAInstall';
+import { PWAInstallBanner } from './components/PWAInstall';
 
 const facilities = [
   "Redemption Hospital (Montserrado)",
@@ -963,7 +963,7 @@ function App() {
           <h2 className="text-xl font-semibold text-neutral-800">
             {activeTabs.find(t => t.id === activeTab)?.label}
           </h2>
-          <PWAInstallButton />
+          
         </header>
         <main className="flex-1 p-6 max-w-7xl mx-auto w-full relative">
           {renderDashboardContent()}
@@ -977,7 +977,7 @@ function App() {
         </main>
       </div>
       <PWAInstallBanner />
-      <PWAUpdateToast />
+      
     </div>
   );
 }
