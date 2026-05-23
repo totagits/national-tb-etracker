@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity, Users, AlertTriangle, ShieldCheck, FileText, UserPlus, LogOut, Search, Filter, Download, ArrowRight, HeartPulse, Building2, Server, Briefcase, Calendar, Database, Stethoscope, Headset, CheckCircle2, Clock, BookOpen, Lock, X, Phone, MessageSquare, MapPin, ExternalLink, ChevronRight, BookMarked, GitBranch, LayoutTemplate } from 'lucide-react';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { generatePatientReportPDF } from './utils/pdfGenerator';
@@ -915,69 +915,180 @@ function App() {
 
   const roleInfo = allRoles.find(r => r.id === selectedRoleId);
   const activeTabs = getTabsForRole(selectedRoleId);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Bottom nav: show first 4 tabs on mobile
+  const bottomNavTabs = activeTabs.slice(0, 4);
 
   return (
-    <div className="flex h-screen bg-neutral-50 font-sans">
-      <div className="w-64 bg-health-blue text-white flex flex-col shadow-lg z-10">
-        <div className="p-4 border-b border-blue-800 flex items-center space-x-2 cursor-pointer" onClick={() => setView('landing')}>
-          <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-10 bg-white rounded-full p-0.5" />
-          <div>
-            <h1 className="font-bold text-lg leading-tight">TB e-Tracker</h1>
-            <p className="text-[10px] text-blue-200 uppercase tracking-wider mt-1">Ministry of Health</p>
+    <div className="flex h-screen bg-neutral-50 font-sans overflow-hidden">
+
+      {/* ── MOBILE DRAWER OVERLAY ── */}
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
+      {/* ── SIDEBAR: hidden on mobile (slides in as drawer), always visible on md+ ── */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 bg-health-blue text-white flex flex-col shadow-2xl
+        transform transition-transform duration-300 ease-in-out
+        ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:relative md:translate-x-0 md:w-64 md:flex md:flex-shrink-0
+      `}>
+        {/* Logo */}
+        <div className="p-4 border-b border-blue-800 flex items-center justify-between">
+          <div className="flex items-center space-x-2 cursor-pointer flex-1" onClick={() => { setView('landing'); setDrawerOpen(false); }}>
+            <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-10 bg-white rounded-full p-0.5 flex-shrink-0" />
+            <div>
+              <h1 className="font-bold text-lg leading-tight">TB e-Tracker</h1>
+              <p className="text-[10px] text-blue-200 uppercase tracking-wider mt-1">Ministry of Health</p>
+            </div>
           </div>
+          {/* Close button inside drawer on mobile */}
+          <button
+            onClick={() => setDrawerOpen(false)}
+            className="md:hidden ml-2 text-blue-200 hover:text-white p-1 rounded-lg hover:bg-blue-800"
+            aria-label="Close menu"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+
+        {/* Nav items */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {activeTabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button 
+              <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)} 
-                className={`flex items-center space-x-3 w-full p-3 rounded-md transition-colors text-sm font-medium ${activeTab === tab.id ? 'bg-blue-800 shadow-inner' : 'hover:bg-blue-800/50'}`}
+                onClick={() => { setActiveTab(tab.id); setDrawerOpen(false); }}
+                className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all text-sm font-medium ${
+                  activeTab === tab.id
+                    ? 'bg-white/20 shadow-inner border border-white/10'
+                    : 'hover:bg-blue-800/50'
+                }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5 flex-shrink-0" />
                 <span>{tab.label}</span>
               </button>
-            )
+            );
           })}
         </nav>
+
+        {/* Footer: role info + logout */}
         <div className="p-4 border-t border-blue-800 space-y-3">
-          <div className="text-xs text-blue-200 flex flex-col space-y-1 bg-blue-900/50 p-2 rounded border border-blue-800">
+          <div className="text-xs text-blue-200 flex flex-col space-y-1 bg-blue-900/50 p-3 rounded-xl border border-blue-800">
             <span className="font-bold text-white border-b border-blue-800 pb-1 mb-1">{roleInfo?.group}</span>
             <div className="flex items-center space-x-2">
               <ShieldCheck className="h-4 w-4 text-green-400" />
               <span>{roleInfo?.name}</span>
             </div>
           </div>
-          <button 
-            onClick={() => setView('login')}
-            className="flex items-center space-x-2 text-sm text-blue-200 hover:text-white w-full px-2 py-2 transition-colors hover:bg-blue-800/50 rounded-md"
+          <button
+            onClick={() => { setView('login'); setDrawerOpen(false); }}
+            className="flex items-center space-x-2 text-sm text-blue-200 hover:text-white w-full px-3 py-2.5 transition-colors hover:bg-blue-800/50 rounded-xl"
           >
             <LogOut className="h-4 w-4" />
             <span>Secure Logout</span>
           </button>
         </div>
-      </div>
-      <div className="flex-1 overflow-auto flex flex-col bg-neutral-50">
-        <header className="bg-white border-b border-neutral-200 p-4 flex justify-between items-center shadow-sm sticky top-0 z-0">
-          <h2 className="text-xl font-semibold text-neutral-800">
-            {activeTabs.find(t => t.id === activeTab)?.label}
-          </h2>
-          
+      </aside>
+
+      {/* ── MAIN CONTENT AREA ── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* Top header bar */}
+        <header className="bg-white border-b border-neutral-200 flex items-center justify-between shadow-sm sticky top-0 z-30 px-4 py-3 md:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Hamburger — only on mobile */}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="md:hidden flex items-center justify-center h-9 w-9 rounded-xl bg-health-blue text-white shadow flex-shrink-0"
+              aria-label="Open menu"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="min-w-0">
+              <h2 className="text-base md:text-xl font-bold text-neutral-800 truncate">
+                {activeTabs.find(t => t.id === activeTab)?.label}
+              </h2>
+              <p className="text-xs text-neutral-400 hidden md:block">{roleInfo?.name}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-neutral-500 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
+              <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></span>
+              Live
+            </div>
+            <button
+              onClick={() => setView('login')}
+              className="md:hidden flex items-center justify-center h-9 w-9 rounded-xl bg-neutral-100 text-neutral-500"
+              aria-label="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </header>
-        <main className="flex-1 p-6 max-w-7xl mx-auto w-full relative">
-          {renderDashboardContent()}
-          
+
+        {/* Scrollable content */}
+        <main className="flex-1 overflow-y-auto p-3 md:p-6 pb-24 md:pb-6">
+          <div className="max-w-7xl mx-auto w-full">
+            {renderDashboardContent()}
+          </div>
+
           {toastMessage && (
-            <div className="fixed bottom-6 right-6 bg-health-blue text-white px-6 py-4 rounded-lg shadow-2xl font-medium animate-bounce z-50 flex items-center gap-3 border-2 border-blue-300">
-              <CheckCircle2 className="h-6 w-6 text-green-400" />
-              <span>{toastMessage}</span>
+            <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-6 md:translate-x-0 bg-health-blue text-white px-5 py-3 rounded-full shadow-2xl font-medium z-50 flex items-center gap-2 border border-blue-300 whitespace-nowrap">
+              <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+              <span className="text-sm">{toastMessage}</span>
             </div>
           )}
         </main>
       </div>
+
+      {/* ── MOBILE BOTTOM NAV BAR ── */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-neutral-200 z-40 flex items-stretch shadow-lg"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {bottomNavTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-1 transition-colors ${
+                isActive ? 'text-health-blue' : 'text-neutral-400'
+              }`}
+            >
+              <Icon className={`h-5 w-5 ${isActive ? 'text-health-blue' : 'text-neutral-400'}`} />
+              <span className={`text-[10px] font-bold truncate max-w-full px-0.5 ${isActive ? 'text-health-blue' : 'text-neutral-400'}`}>
+                {tab.label.split(' ')[0]}
+              </span>
+              {isActive && <span className="h-1 w-4 bg-health-blue rounded-full mt-0.5" />}
+            </button>
+          );
+        })}
+        {/* "More" button opens full drawer */}
+        {activeTabs.length > 4 && (
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-1 text-neutral-400"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            <span className="text-[10px] font-bold">More</span>
+          </button>
+        )}
+      </nav>
+
       <PWAInstallBanner />
-      
     </div>
   );
 }
