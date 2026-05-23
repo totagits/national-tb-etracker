@@ -1,0 +1,212 @@
+{
+  "trackedEntityTypes": [
+    {
+      "id": "TB_PATIENT_TET_ID",
+      "name": "TB Patient",
+      "description": "A person screened, diagnosed, or treated for Tuberculosis.",
+      "publicAccess": "rw------"
+    }
+  ],
+  "trackedEntityAttributes": [
+    { "id": "TEA_TB_ID", "name": "TB Tracker ID", "valueType": "TEXT", "generated": true },
+    { "id": "TEA_NATIONAL_ID", "name": "National ID", "valueType": "TEXT" },
+    { "id": "TEA_FIRST_NAME", "name": "First Name", "valueType": "TEXT" },
+    { "id": "TEA_LAST_NAME", "name": "Last Name", "valueType": "TEXT" },
+    { "id": "TEA_SEX", "name": "Sex", "valueType": "TEXT", "optionSet": { "id": "OS_SEX" } },
+    { "id": "TEA_DOB", "name": "Date of Birth", "valueType": "DATE" }
+  ],
+  "programs": [
+    {
+      "id": "TB_TRACKER_PROGRAM",
+      "name": "National TB e-Tracker",
+      "shortName": "TB Tracker",
+      "programType": "WITH_REGISTRATION",
+      "trackedEntityType": { "id": "TB_PATIENT_TET_ID" },
+      "programStages": [
+        { "id": "PS_SCREENING", "name": "TB Screening", "repeatable": false },
+        { "id": "PS_DIAGNOSIS", "name": "TB Diagnosis and Lab", "repeatable": false },
+        { "id": "PS_TREATMENT", "name": "Treatment Initiation", "repeatable": false },
+        { "id": "PS_TB_HIV", "name": "TB/HIV Co-Infection", "repeatable": false },
+        { "id": "PS_FOLLOW_UP", "name": "Follow-Up Monitoring", "repeatable": true },
+        { "id": "PS_CONTACT", "name": "Contact Tracing", "repeatable": true },
+        { "id": "PS_TRANSFER", "name": "Transfer / Referral", "repeatable": false },
+        { "id": "PS_OUTCOME", "name": "Treatment Outcome", "repeatable": false }
+      ]
+    }
+  ],
+  "optionSets": [
+    {
+      "id": "OS_SEX",
+      "name": "Sex Options",
+      "options": [
+        { "code": "M", "name": "Male" },
+        { "code": "F", "name": "Female" }
+      ]
+    }
+  ],
+  "programRuleVariables": [
+    { "id": "PRV_COUGH", "name": "Cough Duration", "programRuleVariableSourceType": "DATAELEMENT_CURRENT_EVENT", "dataElement": { "id": "DE_COUGH" } },
+    { "id": "PRV_SEX", "name": "Patient Sex", "programRuleVariableSourceType": "TEI_ATTRIBUTE", "trackedEntityAttribute": { "id": "TEA_SEX" } }
+  ],
+  "programRules": [
+    {
+      "id": "PR_HIDE_PREGNANCY_MALE",
+      "name": "Hide Pregnancy for Males",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "condition": "A{TEA_SEX} == 'M'"
+    },
+    {
+      "id": "PR_PRESUMPTIVE_TB_ALERT",
+      "name": "Alert for Presumptive TB",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "condition": "#{PRV_COUGH} == '>= 2 weeks'"
+    }
+  ],
+  "programRuleActions": [
+    {
+      "id": "PRA_HIDE_PREGNANCY",
+      "programRuleActionType": "HIDEFIELD",
+      "programRule": { "id": "PR_HIDE_PREGNANCY_MALE" },
+      "dataElement": { "id": "DE_PREGNANCY" }
+    },
+    {
+      "id": "PRA_SHOW_WARNING_PRESUMPTIVE",
+      "programRuleActionType": "SHOWWARNING",
+      "programRule": { "id": "PR_PRESUMPTIVE_TB_ALERT" },
+      "content": "Patient is presumptive for TB. Proceed to Diagnostic Stage."
+    }
+  ],
+  "programIndicators": [
+    {
+      "id": "PI_CASE_DETECTION",
+      "name": "TB Case Detection (Screening to Diagnosis)",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "expression": "V{enrollment_count}",
+      "filter": "#{DE_PRESUMPTIVE} == 'true' && #{DE_DIAGNOSIS_RESULT} == 'Positive'",
+      "analyticsType": "ENROLLMENT"
+    },
+    {
+      "id": "PI_TREATMENT_CURED",
+      "name": "Treatment Outcome: Cured",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "expression": "V{enrollment_count}",
+      "filter": "#{DE_OUTCOME} == 'Cured'",
+      "analyticsType": "ENROLLMENT"
+    },
+    {
+      "id": "PI_TREATMENT_FAILED",
+      "name": "Treatment Outcome: Failed",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "expression": "V{enrollment_count}",
+      "filter": "#{DE_OUTCOME} == 'Treatment Failed'",
+      "analyticsType": "ENROLLMENT"
+    },
+    {
+      "id": "PI_VIRAL_SUPPRESSION",
+      "name": "Viral Suppression for TB/HIV Co-infected",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "expression": "V{enrollment_count}",
+      "filter": "#{DE_HIV_STATUS} == 'Positive' && #{DE_VIRAL_SUPPRESSION} == 'Suppressed'",
+      "analyticsType": "ENROLLMENT"
+    },
+    {
+      "id": "PI_CO_INFECTION_MGMT",
+      "name": "TB/HIV Co-infection Management Rate",
+      "program": { "id": "TB_TRACKER_PROGRAM" },
+      "expression": "V{enrollment_count}",
+      "filter": "#{DE_HIV_STATUS} == 'Positive' && #{DE_ART_STATUS} == 'On ART'",
+      "analyticsType": "ENROLLMENT"
+    }
+  ],
+  "dataElements": [
+    { "id": "DE_COUGH", "name": "Cough Duration", "valueType": "TEXT", "domainType": "TRACKER" },
+    { "id": "DE_PREGNANCY", "name": "Pregnancy Status", "valueType": "BOOLEAN", "domainType": "TRACKER" },
+    { "id": "DE_OUTCOME", "name": "Treatment Outcome", "valueType": "TEXT", "domainType": "TRACKER" },
+    { "id": "DE_HIV_STATUS", "name": "HIV Status", "valueType": "TEXT", "domainType": "TRACKER" },
+    { "id": "DE_TREATMENT_START_DATE", "name": "Treatment Start Date", "valueType": "DATE", "domainType": "TRACKER" },
+    { "id": "DE_DIAGNOSIS_DATE", "name": "Diagnosis Date", "valueType": "DATE", "domainType": "TRACKER" }
+  ],
+  "validationRules": [
+    {
+      "id": "VR_TREATMENT_START",
+      "name": "Treatment Start After Diagnosis",
+      "description": "Treatment start date cannot be before diagnosis date.",
+      "operator": "greater_than_or_equal_to",
+      "leftSide": { "expression": "#{DE_TREATMENT_START_DATE}" },
+      "rightSide": { "expression": "#{DE_DIAGNOSIS_DATE}" }
+    }
+  ],
+  "dashboards": [
+    {
+      "id": "DB_TB_OVERVIEW",
+      "name": "National TB Overview",
+      "publicAccess": "r-------",
+      "userGroupAccesses": [{ "id": "UG_TB_NATIONAL", "access": "r-rw----" }],
+      "dashboardItems": [ { "id": "DBI_01", "type": "REPORT_TABLE" } ]
+    },
+    {
+      "id": "DB_CASE_DETECTION",
+      "name": "TB Case Detection via Screening",
+      "publicAccess": "r-------",
+      "userGroupAccesses": [{ "id": "UG_TB_NATIONAL", "access": "r-rw----" }, { "id": "UG_TB_COUNTY", "access": "r-r-----" }],
+      "dashboardItems": [ { "id": "DBI_02", "type": "CHART" } ]
+    },
+    {
+      "id": "DB_TREATMENT_OUTCOMES",
+      "name": "Treatment Outcomes (Cured, Failed)",
+      "publicAccess": "--------",
+      "userGroupAccesses": [{ "id": "UG_TB_NATIONAL", "access": "r-rw----" }, { "id": "UG_TB_FACILITY", "access": "r-r-----" }],
+      "dashboardItems": [ { "id": "DBI_03", "type": "CHART" } ]
+    },
+    {
+      "id": "DB_TB_HIV",
+      "name": "TB/HIV Co-infection & Viral Suppression",
+      "publicAccess": "--------",
+      "userGroupAccesses": [{ "id": "UG_TB_HIV_RESTRICTED", "access": "r-rw----" }],
+      "dashboardItems": [ { "id": "DBI_04", "type": "CHART" } ]
+    },
+    {
+      "id": "DB_PERFORMANCE",
+      "name": "County and Facility Performance",
+      "publicAccess": "r-------",
+      "userGroupAccesses": [{ "id": "UG_TB_NATIONAL", "access": "r-rw----" }, { "id": "UG_TB_COUNTY", "access": "r-r-----" }],
+      "dashboardItems": [ { "id": "DBI_05", "type": "REPORT_TABLE" } ]
+    }
+  ],
+  "userRoles": [
+    {
+      "id": "UR_NATIONAL_ADMIN",
+      "name": "National System Administrator",
+      "authorities": ["ALL"]
+    },
+    {
+      "id": "UR_FACILITY_CLERK",
+      "name": "Facility Data Clerk",
+      "authorities": ["F_TRACKED_ENTITY_INSTANCE_ADD", "F_PROGRAM_ENROLLMENT", "F_PROGRAM_UNENROLLMENT"]
+    },
+    {
+      "id": "UR_TB_HIV_OFFICER",
+      "name": "TB/HIV Clinical Officer (Restricted)",
+      "authorities": ["F_TRACKED_ENTITY_DATAVALUE_ADD", "F_HIV_DATA_READ"]
+    }
+  ],
+  "userGroups": [
+    {
+      "id": "UG_TB_NATIONAL",
+      "name": "TB National Team"
+    },
+    {
+      "id": "UG_TB_COUNTY",
+      "name": "TB County M&E Officers"
+    },
+    {
+      "id": "UG_TB_FACILITY",
+      "name": "TB Facility Staff"
+    },
+    {
+      "id": "UG_TB_HIV_RESTRICTED",
+      "name": "TB/HIV Restricted Clinical Access",
+      "description": "Strictly limited group for HIV confidentiality"
+    }
+  ]
+}
