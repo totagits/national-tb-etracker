@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Activity, Users, AlertTriangle, ShieldCheck, FileText, UserPlus, LogOut, Search, Filter, Download, ArrowRight, HeartPulse, Building2, Server, Briefcase, Calendar, Database, Stethoscope, Headset, CheckCircle2, Clock, BookOpen, Lock, X, Phone, MessageSquare, MapPin, ExternalLink, ChevronRight, BookMarked, GitBranch, LayoutTemplate } from 'lucide-react';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { generatePatientReportPDF } from './utils/pdfGenerator';
@@ -435,6 +435,7 @@ function App() {
   const [docTab, setDocTab] = useState('architecture');
   const [selectedRoleId, setSelectedRoleId] = useState('national_admin');
   const [toastMessage, setToastMessage] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [patients, setPatients] = useState(initialPatients);
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
 
@@ -915,7 +916,7 @@ function App() {
 
   const roleInfo = allRoles.find(r => r.id === selectedRoleId);
   const activeTabs = getTabsForRole(selectedRoleId);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+
 
   // Bottom nav: show first 4 tabs on mobile
   const bottomNavTabs = activeTabs.slice(0, 4);
