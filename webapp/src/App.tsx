@@ -912,7 +912,7 @@ function App() {
                   value={accessInput}
                   onChange={e => { setAccessInput(e.target.value.toUpperCase()); setAccessError(''); }}
                   onKeyDown={e => e.key === 'Enter' && handleAccessSubmit()}
-                  placeholder="e.g. MOH-TB-2026"
+                  placeholder="Enter access code"
                   autoFocus
                   className={`w-full bg-white/10 border rounded-xl px-4 py-3.5 text-white placeholder-white/30 font-mono text-lg tracking-widest text-center outline-none focus:ring-2 transition-all ${
                     accessError ? 'border-red-400 focus:ring-red-400/50' : 'border-white/20 focus:ring-blue-400/50 focus:border-blue-400/50'
