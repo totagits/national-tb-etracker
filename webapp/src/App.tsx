@@ -881,7 +881,7 @@ function App() {
           {/* MoH Logo + Title */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center h-36 w-36 mb-5 mx-auto">
-              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-36 w-36 object-contain drop-shadow-2xl" />
+              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-36 w-36 object-contain drop-shadow-2xl" style={{ clipPath: 'circle(46% at 50% 50%)' }} />
             </div>
             <h1 className="text-2xl font-black text-white tracking-tight">TB e-Tracker</h1>
             <p className="text-blue-300 text-sm mt-1">Ministry of Health · Republic of Liberia</p>
