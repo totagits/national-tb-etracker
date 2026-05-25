@@ -880,8 +880,8 @@ function App() {
         <div className="relative z-10 w-full max-w-md mx-4">
           {/* MoH Logo + Title */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center h-20 w-20 bg-white rounded-2xl shadow-2xl mb-4 mx-auto">
-              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-16 w-16 object-contain rounded-xl" />
+            <div className="inline-flex items-center justify-center h-36 w-36 bg-white rounded-full shadow-2xl mb-5 mx-auto border-4 border-white/20">
+              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-32 w-32 object-contain rounded-full" />
             </div>
             <h1 className="text-2xl font-black text-white tracking-tight">TB e-Tracker</h1>
             <p className="text-blue-300 text-sm mt-1">Ministry of Health · Republic of Liberia</p>
