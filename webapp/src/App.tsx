@@ -12,6 +12,18 @@ import { NationalAdminDashboard } from './components/NationalAdminDashboard';
 import { ProgramIndicatorsDashboard } from './components/ProgramIndicatorsDashboard';
 import { RegistrationWizard } from './components/RegistrationWizard';
 import { PWAInstallBanner } from './components/PWAInstall';
+import { DHIS2ConnectionModal } from './components/DHIS2ConnectionModal';
+import {
+  getDHIS2Config,
+  getStoredPatients,
+  savePatientRecord,
+  pushPatientToDHIS2,
+  type DHIS2Config,
+  type PatientRecord
+} from './api/dhis2';
+
+// Base URL for assets — resolves to '/national-tb-etracker/' on GitHub Pages, '/' in dev
+const B = import.meta.env.BASE_URL;
 
 const facilities = [
   "Redemption Hospital (Montserrado)",
@@ -36,23 +48,16 @@ const facilities = [
   "Rivercess Health Center (Rivercess)"
 ];
 
-const initialPatients = [
-  { id: 'TB-1042', name: 'John Doe', age: 45, sex: 'M', facility: 'JFK Medical Center', status: 'On Treatment' },
-  { id: 'TB-1043', name: 'Jane Smith', age: 32, sex: 'F', facility: 'Redemption Hospital', status: 'Presumptive' },
-  { id: 'TB-1044', name: 'Michael Johnson', age: 28, sex: 'M', facility: 'CH Rennie Hospital', status: 'Cured' },
-  { id: 'TB-1045', name: 'Sarah Williams', age: 51, sex: 'F', facility: 'Phebe Hospital', status: 'Lost to Follow-up' },
-  { id: 'TB-1046', name: 'David Brown', age: 39, sex: 'M', facility: 'Jackson F. Doe Hospital', status: 'On Treatment' },
-];
 
 const carouselImages = [
-  '/assets/tb_exterior.png',
-  '/assets/tb_interior.png',
-  '/assets/tb_community.png'
+  B + 'assets/tb_exterior.png',
+  B + 'assets/tb_interior.png',
+  B + 'assets/tb_community.png'
 ];
 
 // ─── Patient Search Panel (proper React component — fixes hook-in-render blink) ──
-const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm }: {
-  patients: any[]; patientSearchTerm: string; setPatientSearchTerm: (v: string) => void;
+const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm, onOpenConnectionModal }: {
+  patients: any[]; patientSearchTerm: string; setPatientSearchTerm: (v: string) => void; onOpenConnectionModal?: () => void;
 }) => {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState('All');
@@ -112,7 +117,13 @@ const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm 
         <button onClick={handleExportCSV} className="border border-neutral-200 text-neutral-600 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 hover:bg-neutral-50 font-medium">
           <Download className="h-4 w-4" /> Export CSV
         </button>
+        {onOpenConnectionModal && (
+          <button onClick={onOpenConnectionModal} className="border border-neutral-200 bg-neutral-50 hover:bg-white text-neutral-700 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 font-medium shadow-sm">
+            <Database className="h-4 w-4 text-health-blue" /> DHIS2 & Data Pipeline
+          </button>
+        )}
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
@@ -438,7 +449,9 @@ function App() {
   const [selectedRoleId, setSelectedRoleId] = useState('national_admin');
   const [toastMessage, setToastMessage] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [patients, setPatients] = useState(initialPatients);
+  const [dhis2Config, setDhis2Config] = useState<DHIS2Config>(getDHIS2Config);
+  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+  const [patients, setPatients] = useState<PatientRecord[]>(getStoredPatients);
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
   // Access code gate
   const [accessGranted, setAccessGranted] = useState(() => sessionStorage.getItem('tb_access') === 'granted');
@@ -460,8 +473,20 @@ function App() {
     }
   };
 
-  const handleRegisterPatient = (newPatient: any) => {
-    setPatients([newPatient, ...patients]);
+  const handleRegisterPatient = async (newPatient: any) => {
+    const updated = savePatientRecord(newPatient);
+    setPatients(updated);
+
+    if (dhis2Config.mode === 'live') {
+      const res = await pushPatientToDHIS2(newPatient, dhis2Config);
+      if (res.success) {
+        (window as any).showToast(`Live Sync: Patient ${newPatient.id} synchronized to DHIS2.`);
+      } else {
+        (window as any).showToast(`Local Fallback: Saved locally (${res.message}).`);
+      }
+    } else {
+      (window as any).showToast(`Patient ${newPatient.id} saved to persistent registry.`);
+    }
   };
 
   useEffect(() => {
@@ -564,13 +589,27 @@ function App() {
   const renderPublicHeader = () => (
     <header className="bg-white border-b border-neutral-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
       <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setView('landing')}>
-        <img src="/assets/moh_logo.png" alt="MoH Liberia" className="h-12 w-auto object-contain" />
+        <img src={B + "assets/moh_logo.png"} alt="MoH Liberia" className="h-12 w-auto object-contain" />
         <div className="hidden md:block">
           <h1 className="font-bold text-xl leading-tight text-neutral-900">Ministry of Health</h1>
           <p className="text-[10px] text-health-blue uppercase tracking-widest font-semibold">Republic of Liberia</p>
         </div>
       </div>
-      <div className="flex items-center space-x-6">
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={() => setIsConnectionModalOpen(true)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+            dhis2Config.mode === 'live'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+              : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+          }`}
+          title="Configure DHIS2 API or Data Pipeline"
+        >
+          <span className={`h-2 w-2 rounded-full ${
+            dhis2Config.mode === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+          }`} />
+          <span>{dhis2Config.mode === 'live' ? 'Live DHIS2 API' : 'Demo & Training Mode'}</span>
+        </button>
         <button onClick={() => setView('about')} className={`text-sm font-medium transition-colors ${view === 'about' ? 'text-health-blue' : 'text-neutral-600 hover:text-health-blue'}`}>About Platform</button>
         <button onClick={() => setView('docs')} className={`text-sm font-medium transition-colors ${view === 'docs' ? 'text-health-blue' : 'text-neutral-600 hover:text-health-blue'}`}>Documentation</button>
         <button 
@@ -595,7 +634,7 @@ function App() {
     }
 
     if (activeTab === 'search') {
-      return <PatientSearchPanel patients={patients} patientSearchTerm={patientSearchTerm} setPatientSearchTerm={setPatientSearchTerm} />;
+      return <PatientSearchPanel patients={patients} patientSearchTerm={patientSearchTerm} setPatientSearchTerm={setPatientSearchTerm} onOpenConnectionModal={() => setIsConnectionModalOpen(true)} />;
     }
 
     if (activeTab === 'defaulters') {
@@ -637,27 +676,32 @@ function App() {
             <h3 className="text-2xl font-bold mb-8 border-b border-neutral-100 pb-4 text-center">Project Stakeholders</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { name:'Ministry of Health, Liberia', role:'Program Owner & National HMIS Authority', url:'https://moh-lr.org/', logo:'/assets/moh_logo.png', initials:'MoH', bg:'bg-health-blue', text:'text-white', desc:'The MoH leads all national TB programme policy, coordinates health system delivery, and owns the national DHIS2 instance on which this platform operates.' },
+                { name:'Ministry of Health, Liberia', role:'Program Owner & National HMIS Authority', url:'https://moh.gov.lr/', logo:B + 'assets/moh_logo.png', initials:'MoH', bg:'bg-health-blue', text:'text-white', desc:'The MoH leads all national TB programme policy, coordinates health system delivery, and owns the national DHIS2 instance on which this platform operates.' },
                 { name:'Plan International Liberia', role:'Implementing Partner & Project Lead', url:'https://plan-international.org/liberia/', initials:'PLAN', bg:'bg-blue-100', text:'text-health-blue', desc:'Plan International is the primary implementing partner for the TB e-Tracker project, responsible for project management, training rollout, and stakeholder engagement across all 15 counties.' },
                 { name:'The Global Fund', role:'Funder — TB Grant Cycle 7', url:'https://www.theglobalfund.org/', initials:'GF', bg:'bg-green-100', text:'text-green-700', desc:'The Global Fund finances this initiative through the Liberia TB/HIV Cycle 7 grant, with accountability to national epidemiological targets and WHO End TB Strategy milestones.' },
               ].map(s => (
-                <div key={s.name} className="border border-neutral-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-                  <div className={`${s.bg} p-6 flex items-center justify-center`}>
-                    {s.logo ? <img src={s.logo} alt={s.name} className="h-16 object-contain" /> : <span className={`text-3xl font-black ${s.text}`}>{s.initials}</span>}
-                  </div>
-                  <div className="p-5">
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-bold text-neutral-800 hover:text-health-blue flex items-center gap-1 group">
-                      {s.name}<ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div key={s.name} className="border border-neutral-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between">
+                  <div>
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className={`${s.bg} p-6 flex items-center justify-center hover:opacity-95 transition-opacity block cursor-pointer`} title={`Visit official website: ${s.url}`}>
+                      {s.logo ? <img src={s.logo} alt={s.name} className="h-16 object-contain" /> : <span className={`text-3xl font-black ${s.text}`}>{s.initials}</span>}
                     </a>
-                    <p className="text-xs text-health-blue font-bold mt-0.5 mb-3">{s.role}</p>
-                    <p className="text-sm text-neutral-600">{s.desc}</p>
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs text-health-blue font-bold hover:underline">
+                    <div className="p-5">
+                      <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-bold text-neutral-800 hover:text-health-blue flex items-center gap-1 group cursor-pointer">
+                        {s.name}<ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
+                      <p className="text-xs text-health-blue font-bold mt-0.5 mb-3">{s.role}</p>
+                      <p className="text-sm text-neutral-600">{s.desc}</p>
+                    </div>
+                  </div>
+                  <div className="p-5 pt-0">
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs text-health-blue font-bold hover:underline cursor-pointer">
                       <MapPin className="h-3.5 w-3.5" /> Visit Official Website
                     </a>
                   </div>
                 </div>
               ))}
             </div>
+
           </div>
         </main>
       </div>
@@ -696,14 +740,14 @@ function App() {
                     { id:'TEA-010', name:'Facility', type:'ORGANISATION_UNIT', mandatory:true, searchable:true },
                     { id:'TEA-008', name:'HIV Status', type:'TEXT (Option Set)', mandatory:false, searchable:false },
                   ]},
-                  { section:'Program Stages', icon: GitBranch, items:[
-                    { id:'PS-01', name:'TB Screening & Presumptive Identification', type:'Non-repeatable · Day 0', mandatory:true, searchable:false },
-                    { id:'PS-02', name:'Diagnostic Investigation', type:'Non-repeatable · Day 7', mandatory:true, searchable:false },
-                    { id:'PS-03', name:'TB Diagnosis Confirmation', type:'Non-repeatable · Day 14', mandatory:true, searchable:false },
-                    { id:'PS-04', name:'Treatment Initiation', type:'Non-repeatable · Day 21', mandatory:true, searchable:false },
-                    { id:'PS-05', name:'Monthly Treatment Follow-up', type:'Repeatable · Day 30+', mandatory:true, searchable:false },
-                    { id:'PS-07', name:'HIV/TB Co-infection Assessment', type:'Non-repeatable · Day 14', mandatory:false, searchable:false },
-                    { id:'PS-08', name:'Treatment Outcome Recording', type:'Non-repeatable · Day 180', mandatory:true, searchable:false },
+                  { section:'Program Stages (Core TOR Specification)', icon: GitBranch, items:[
+                    { id:'PS-01', name:'Enrollment / Registration', type:'Non-repeatable · Day 0', mandatory:true, searchable:true },
+                    { id:'PS-02', name:'HIV Testing Services (HTS)', type:'Non-repeatable · Day 0', mandatory:true, searchable:false },
+                    { id:'PS-03', name:'TB Screening and Diagnosis', type:'Non-repeatable · Day 7', mandatory:true, searchable:false },
+                    { id:'PS-04', name:'Treatment Initiation', type:'Non-repeatable · Day 14', mandatory:true, searchable:false },
+                    { id:'PS-05', name:'Follow-Up Monitoring', type:'Repeatable · Day 30+', mandatory:true, searchable:false },
+                    { id:'PS-06', name:'HIV Viral Load/Adherence Monitoring (manual)', type:'Repeatable · Day 60+', mandatory:false, searchable:false },
+                    { id:'PS-07', name:'Treatment Outcome', type:'Non-repeatable · Day 180', mandatory:true, searchable:false },
                   ]},
                   { section:'Option Sets', icon: LayoutTemplate, items:[
                     { id:'OS-004', name:'Treatment Outcome', type:'Cured · Treatment Completed · Failed · LTFU · Died', mandatory:false, searchable:false },
@@ -764,19 +808,18 @@ function App() {
               <div className="p-8 space-y-6">
                 <div><h2 className="text-3xl font-bold text-neutral-900">Workflow Diagrams</h2><p className="text-neutral-500 mt-1 text-sm">TB cascade logic from presumptive identification to treatment outcome — per WHO End TB Strategy & NTP Liberia guidelines</p></div>
                 {[
-                  { title:'1. TB Screening & Enrollment Workflow', color:'border-purple-500', steps:[
-                    { label:'Patient arrives at facility', note:'Walk-in or CHW referral', icon:'👤' },
-                    { label:'WHO 4-symptom screen', note:'Cough > 2wk · Night sweats · Weight loss · Fever', icon:'🩺' },
-                    { label:'AI risk score assigned', note:'Low / Medium / High / Confirmed Presumptive', icon:'🤖' },
-                    { label:'If Presumptive → Diagnostic Investigation (PS-02)', note:'GeneXpert MTB/RIF or Smear Microscopy ordered', icon:'🔬' },
-                    { label:'If confirmed → Enrollment & treatment initiation', note:'DHIS2 Tracker enrollment created · TB Registration ID auto-generated', icon:'📋' },
+                  { title:'1. TB Screening, HTS & Enrollment Workflow (PS-01 to PS-03)', color:'border-purple-500', steps:[
+                    { label:'Patient arrives at facility / CHW referral', note:'Screened at OPD or community outreach across 31 sites', icon:'👤' },
+                    { label:'Enrollment / Registration (PS-01)', note:'Demographics, national ID & unique TB ID (e.g. TB-1042) auto-generated', icon:'📋' },
+                    { label:'HIV Testing Services - HTS (PS-02)', note:'Opt-out rapid HIV test · Pre/post-test counseling · Linkage to ART if positive', icon:'❤️‍🩹' },
+                    { label:'TB Screening and Diagnosis (PS-03)', note:'WHO 4-symptom screen · GeneXpert MTB/RIF · Sputum smear microscopy', icon:'🔬' },
+                    { label:'Clinical Diagnosis Confirmation', note:'Bacteriologically confirmed or clinically diagnosed pulmonary/extrapulmonary TB', icon:'🩺' },
                   ]},
-                  { title:'2. Treatment & Follow-up Workflow', color:'border-green-500', steps:[
-                    { label:'Treatment Initiation (PS-04)', note:'1st Line: 2HRZE/4HR · Regimen assigned by clinician', icon:'💊' },
-                    { label:'Monthly Follow-up (PS-05, repeatable)', note:'DOT adherence recorded · Drug pickup confirmed', icon:'📅' },
-                    { label:'Sputum conversion check (PS-06)', note:'End of intensive phase (month 2) · End of treatment (month 6)', icon:'🧪' },
-                    { label:'HIV/TB co-infection assessment (PS-07)', note:'HIV test if unknown status · CPT/ART enrollment if positive', icon:'❤️‍🩹' },
-                    { label:'Treatment Outcome (PS-08)', note:'Cured / Completed / Failed / LTFU / Died · Cascade closed', icon:'✅' },
+                  { title:'2. Treatment, Monitoring & Viral Suppression Workflow (PS-04 to PS-07)', color:'border-green-500', steps:[
+                    { label:'Treatment Initiation (PS-04)', note:'1st Line: 2HRZE/4HR (or 2nd Line MDR-TB) · Weight-band dosage · DOT assigned', icon:'💊' },
+                    { label:'Follow-Up Monitoring (PS-05, repeatable)', note:'Monthly visit · Sputum smear conversion check at Mo 2 & Mo 5 · Adherence %', icon:'📅' },
+                    { label:'HIV Viral Load/Adherence Monitoring - manual (PS-06)', note:'Viral load blood draw · Target <1000 copies/mL · Enhanced Adherence Counseling', icon:'🧪' },
+                    { label:'Treatment Outcome (PS-07)', note:'Cured / Completed / Failed / LTFU / Died · National NTP closeout recorded', icon:'✅' },
                   ]},
                   { title:'3. Defaulter Detection & Tracing Workflow', color:'border-red-500', steps:[
                     { label:'System flags patient as defaulter', note:'Missing 2+ consecutive monthly visits', icon:'🚨' },
@@ -881,7 +924,7 @@ function App() {
           {/* MoH Logo + Title */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center h-36 w-36 mb-5 mx-auto">
-              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-36 w-36 object-contain drop-shadow-2xl" style={{ clipPath: 'circle(46% at 50% 50%)' }} />
+              <img src={B + "assets/moh_logo.png"} alt="MoH Logo" className="h-36 w-36 object-contain drop-shadow-2xl" style={{ clipPath: 'circle(46% at 50% 50%)' }} />
             </div>
             <h1 className="text-2xl font-black text-white tracking-tight">TB e-Tracker</h1>
             <p className="text-blue-300 text-sm mt-1">Ministry of Health · Republic of Liberia</p>
@@ -1012,7 +1055,7 @@ function App() {
           <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(#004e89 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
           <div className="bg-white p-8 rounded-xl shadow-2xl w-[450px] border-t-4 border-t-health-blue z-10">
             <div className="flex flex-col items-center mb-8">
-              <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-20 mb-4" />
+              <img src={B + "assets/moh_logo.png"} alt="MoH Logo" className="h-20 mb-4" />
               <h2 className="text-2xl font-bold text-center text-neutral-900">System Login</h2>
               <p className="text-sm text-neutral-500 mt-2 text-center">Authenticate via National DHIS2 Instance</p>
             </div>
@@ -1078,7 +1121,7 @@ function App() {
         {/* Logo */}
         <div className="p-4 border-b border-blue-800 flex items-center justify-between">
           <div className="flex items-center space-x-2 cursor-pointer flex-1" onClick={() => { setView('landing'); setDrawerOpen(false); }}>
-            <img src="/assets/moh_logo.png" alt="MoH Logo" className="h-10 bg-white rounded-full p-0.5 flex-shrink-0" />
+            <img src={B + "assets/moh_logo.png"} alt="MoH Logo" className="h-10 bg-white rounded-full p-0.5 flex-shrink-0" />
             <div>
               <h1 className="font-bold text-lg leading-tight">TB e-Tracker</h1>
               <p className="text-[10px] text-blue-200 uppercase tracking-wider mt-1">Ministry of Health</p>
@@ -1160,10 +1203,20 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-neutral-500 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full">
-              <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></span>
-              Live
-            </div>
+            <button
+              onClick={() => setIsConnectionModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                dhis2Config.mode === 'live'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+              }`}
+              title="Click to manage DHIS2 Live API or Data Pipeline"
+            >
+              <span className={`h-2 w-2 rounded-full ${
+                dhis2Config.mode === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+              }`} />
+              <span>{dhis2Config.mode === 'live' ? 'Live DHIS2' : 'Demo Mode'}</span>
+            </button>
             <button
               onClick={() => setView('login')}
               className="md:hidden flex items-center justify-center h-9 w-9 rounded-xl bg-neutral-100 text-neutral-500"
@@ -1224,6 +1277,13 @@ function App() {
           </button>
         )}
       </nav>
+
+      <DHIS2ConnectionModal
+        isOpen={isConnectionModalOpen}
+        onClose={() => setIsConnectionModalOpen(false)}
+        onConfigChange={(newCfg) => setDhis2Config(newCfg)}
+        onPatientsChange={(updatedPts) => setPatients(updatedPts)}
+      />
 
       <PWAInstallBanner />
     </div>

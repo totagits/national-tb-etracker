@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { generateTrainingDocPDF } from '../utils/pdfGenerator';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { TRAINING_SESSIONS, ALL_COUNTIES } from '../data/liberiaData';
 
+const B = import.meta.env.BASE_URL; // GitHub Pages base path
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -129,9 +130,9 @@ const MaterialsTab = () => {
   };
 
   const VIDEO_THUMBS: Record<string, string> = {
-    'MAT-005': '/assets/vid_intro.png',
-    'MAT-006': '/assets/vid_registration.png',
-    'MAT-007': '/assets/vid_sync.png',
+    'MAT-005': B + 'assets/vid_intro.png',
+    'MAT-006': B + 'assets/vid_registration.png',
+    'MAT-007': B + 'assets/vid_sync.png',
   };
   const VIDEO_DURATIONS: Record<string, string> = {
     'MAT-005': '18:34',
@@ -198,7 +199,7 @@ const MaterialsTab = () => {
           <div key={m.id} className="bg-white rounded-xl border border-neutral-200 shadow-sm hover:shadow-md hover:border-health-blue/30 transition-all overflow-hidden">
             {m.category === 'Video' ? (
               <div className="relative group cursor-pointer" onClick={() => setPreviewVideo(m)}>
-                <img src={VIDEO_THUMBS[m.id] || '/assets/vid_intro.png'} alt={m.title}
+                <img src={VIDEO_THUMBS[m.id] || B + 'assets/vid_intro.png'} alt={m.title}
                   className="w-full h-44 object-cover" />
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/50 transition-colors">
                   <div className="h-14 w-14 bg-white/90 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
@@ -268,7 +269,7 @@ const MaterialsTab = () => {
               ) : (
                 <>
                   <img
-                    src={VIDEO_THUMBS[previewVideo.id] || '/assets/vid_intro.png'}
+                    src={VIDEO_THUMBS[previewVideo.id] || B + 'assets/vid_intro.png'}
                     alt={previewVideo.title}
                     className="w-full h-full object-cover opacity-70"
                   />
