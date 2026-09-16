@@ -210,3 +210,139 @@ export const AUDIT_LOGS: AuditLog[] = [
   { timestamp: '2026-05-20 14:22:18', user: 'facility_clerk_mon2', role: 'Facility Data Clerk', county: 'Montserrado', action: 'DELETE', resource: 'Duplicate Record (TB-1412-B)', status: 'BLOCKED', ipAddress: '41.66.128.55' },
   { timestamp: '2026-05-20 13:05:00', user: 'informatics_01', role: 'Informatics Specialist', county: 'National', action: 'READ', resource: 'National Cohort Report (All Counties)', status: 'SUCCESS', ipAddress: '41.66.130.18' },
 ];
+
+// ─── WHO TB Cohort Analysis Layer ─────────────────────────────────────────────
+export interface WHOCohort {
+  quarter: string;
+  name: string;
+  regimenType: 'DS-TB (6-Month)' | 'TB/HIV Co-Infected' | 'MDR/RR-TB (24-Month)' | 'Pediatric TB (0-14)';
+  enrolled: number;
+  bactConfirmed: number;
+  clinDiagnosed: number;
+  cured: number;
+  completed: number;
+  treatmentSuccessRate: number; // ((cured + completed) / enrolled) * 100
+  failed: number;
+  died: number;
+  ltfu: number;
+  notEvaluated: number;
+  artInitiatedPct?: number;
+  conversionAt2MonthsPct: number;
+}
+
+export const WHO_COHORTS: WHOCohort[] = [
+  {
+    quarter: '2025-Q1',
+    name: '2025 Q1 Evaluated Cohort',
+    regimenType: 'DS-TB (6-Month)',
+    enrolled: 742,
+    bactConfirmed: 520,
+    clinDiagnosed: 222,
+    cured: 488,
+    completed: 172,
+    treatmentSuccessRate: 88.9,
+    failed: 14,
+    died: 31,
+    ltfu: 29,
+    notEvaluated: 8,
+    conversionAt2MonthsPct: 86.4
+  },
+  {
+    quarter: '2025-Q2',
+    name: '2025 Q2 Evaluated Cohort',
+    regimenType: 'DS-TB (6-Month)',
+    enrolled: 785,
+    bactConfirmed: 560,
+    clinDiagnosed: 225,
+    cured: 522,
+    completed: 180,
+    treatmentSuccessRate: 89.4,
+    failed: 16,
+    died: 28,
+    ltfu: 31,
+    notEvaluated: 8,
+    conversionAt2MonthsPct: 87.8
+  },
+  {
+    quarter: '2025-Q3',
+    name: '2025 Q3 Evaluated Cohort',
+    regimenType: 'DS-TB (6-Month)',
+    enrolled: 810,
+    bactConfirmed: 585,
+    clinDiagnosed: 225,
+    cured: 546,
+    completed: 184,
+    treatmentSuccessRate: 90.1,
+    failed: 12,
+    died: 29,
+    ltfu: 32,
+    notEvaluated: 7,
+    conversionAt2MonthsPct: 89.1
+  },
+  {
+    quarter: '2025-Q4',
+    name: '2025 Q4 Evaluated Cohort',
+    regimenType: 'DS-TB (6-Month)',
+    enrolled: 834,
+    bactConfirmed: 605,
+    clinDiagnosed: 229,
+    cured: 568,
+    completed: 188,
+    treatmentSuccessRate: 90.6,
+    failed: 15,
+    died: 27,
+    ltfu: 30,
+    notEvaluated: 6,
+    conversionAt2MonthsPct: 90.2
+  },
+  {
+    quarter: '2026-Q1',
+    name: '2026 Q1 Interim Cohort (Active)',
+    regimenType: 'DS-TB (6-Month)',
+    enrolled: 865,
+    bactConfirmed: 630,
+    clinDiagnosed: 235,
+    cured: 310,
+    completed: 75,
+    treatmentSuccessRate: 88.5,
+    failed: 9,
+    died: 22,
+    ltfu: 24,
+    notEvaluated: 425,
+    conversionAt2MonthsPct: 91.0
+  },
+  {
+    quarter: '2025-Q4',
+    name: '2025 Q4 TB/HIV Co-infected Cohort',
+    regimenType: 'TB/HIV Co-Infected',
+    enrolled: 188,
+    bactConfirmed: 130,
+    clinDiagnosed: 58,
+    cured: 118,
+    completed: 40,
+    treatmentSuccessRate: 84.0,
+    failed: 5,
+    died: 14,
+    ltfu: 9,
+    notEvaluated: 2,
+    artInitiatedPct: 94.7,
+    conversionAt2MonthsPct: 82.5
+  },
+  {
+    quarter: '2024-Q1',
+    name: '2024 Q1 MDR-TB 24-Month Final Cohort',
+    regimenType: 'MDR/RR-TB (24-Month)',
+    enrolled: 42,
+    bactConfirmed: 42,
+    clinDiagnosed: 0,
+    cured: 28,
+    completed: 4,
+    treatmentSuccessRate: 76.2,
+    failed: 3,
+    died: 4,
+    ltfu: 3,
+    notEvaluated: 0,
+    conversionAt2MonthsPct: 78.6
+  }
+];
+

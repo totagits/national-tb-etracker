@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Users, AlertTriangle, ShieldCheck, FileText, UserPlus, LogOut, Search, Filter, Download, ArrowRight, HeartPulse, Building2, Server, Briefcase, Calendar, Database, Stethoscope, Headset, CheckCircle2, Clock, BookOpen, Lock, X, Phone, MessageSquare, MapPin, ExternalLink, ChevronRight, BookMarked, GitBranch, LayoutTemplate } from 'lucide-react';
+import { Activity, Users, AlertTriangle, ShieldCheck, FileText, UserPlus, LogOut, Search, Filter, Download, ArrowRight, HeartPulse, Building2, Server, Briefcase, Calendar, Database, Stethoscope, Headset, CheckCircle2, Clock, BookOpen, Lock, X, Phone, MessageSquare, MapPin, ExternalLink, ChevronRight, BookMarked, GitBranch, LayoutTemplate, Award } from 'lucide-react';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { generatePatientReportPDF } from './utils/pdfGenerator';
 import { DirectorDashboard } from './components/DirectorDashboard';
@@ -13,6 +13,9 @@ import { ProgramIndicatorsDashboard } from './components/ProgramIndicatorsDashbo
 import { RegistrationWizard } from './components/RegistrationWizard';
 import { PWAInstallBanner } from './components/PWAInstall';
 import { DHIS2ConnectionModal } from './components/DHIS2ConnectionModal';
+import { LongitudinalTimelineModal } from './components/LongitudinalTimelineModal';
+import { GeospatialTracingMap } from './components/GeospatialTracingMap';
+import { CohortAnalysisDashboard } from './components/CohortAnalysisDashboard';
 import {
   getDHIS2Config,
   getStoredPatients,
@@ -56,8 +59,8 @@ const carouselImages = [
 ];
 
 // ─── Patient Search Panel (proper React component — fixes hook-in-render blink) ──
-const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm, onOpenConnectionModal }: {
-  patients: any[]; patientSearchTerm: string; setPatientSearchTerm: (v: string) => void; onOpenConnectionModal?: () => void;
+const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm, onOpenConnectionModal, onOpenTimeline }: {
+  patients: any[]; patientSearchTerm: string; setPatientSearchTerm: (v: string) => void; onOpenConnectionModal?: () => void; onOpenTimeline?: (p: any) => void;
 }) => {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState('All');
@@ -180,6 +183,11 @@ const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm,
                   <p className="text-xs text-neutral-400 mt-1 text-right">{progressPct(selectedPatient)}% complete</p>
                 </div>
                 <div className="pt-2 space-y-2">
+                  {onOpenTimeline && (
+                    <button onClick={() => onOpenTimeline(selectedPatient)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors">
+                      <Activity className="h-4 w-4" /> Standardized Longitudinal Timeline
+                    </button>
+                  )}
                   <button onClick={() => setChartPatient(selectedPatient)} className="w-full bg-health-blue text-white py-2 rounded-lg font-bold text-sm hover:bg-blue-800 flex items-center justify-center gap-2">
                     <HeartPulse className="h-4 w-4" /> View Full Chart
                   </button>
@@ -453,6 +461,7 @@ function App() {
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [patients, setPatients] = useState<PatientRecord[]>(getStoredPatients);
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
+  const [selectedTimelinePatient, setSelectedTimelinePatient] = useState<PatientRecord | null>(null);
   // Access code gate
   const [accessGranted, setAccessGranted] = useState(() => sessionStorage.getItem('tb_access') === 'granted');
   const [accessInput, setAccessInput] = useState('');
@@ -480,12 +489,10 @@ function App() {
     if (dhis2Config.mode === 'live') {
       const res = await pushPatientToDHIS2(newPatient, dhis2Config);
       if (res.success) {
-        (window as any).showToast(`Live Sync: Patient ${newPatient.id} synchronized to DHIS2.`);
+        if ((window as any).showToast) (window as any).showToast(`Live DHIS2 Sync: Patient ${newPatient.id} pushed successfully!`);
       } else {
-        (window as any).showToast(`Local Fallback: Saved locally (${res.message}).`);
+        if ((window as any).showToast) (window as any).showToast(`DHIS2 Sync Error: ${res.message}`);
       }
-    } else {
-      (window as any).showToast(`Patient ${newPatient.id} saved to persistent registry.`);
     }
   };
 
@@ -518,6 +525,8 @@ function App() {
           { id: 'dashboard', icon: Activity, label: 'National Dashboard' },
           { id: 'registration', icon: UserPlus, label: 'Registration Wizard' },
           { id: 'search', icon: Users, label: 'Patient Search' },
+          { id: 'geospatial', icon: MapPin, label: 'Geospatial Tracing' },
+          { id: 'cohort_analysis', icon: Award, label: 'WHO Cohort Analysis' },
           { id: 'defaulters', icon: AlertTriangle, label: 'Defaulter List' },
           { id: 'reports', icon: FileText, label: 'System Reports' }
         ];
@@ -525,6 +534,7 @@ function App() {
         return [
           { id: 'registration', icon: UserPlus, label: 'Registration Wizard' },
           { id: 'search', icon: Users, label: 'Facility Patients' },
+          { id: 'geospatial', icon: MapPin, label: 'Community Geolocation' },
           { id: 'defaulters', icon: AlertTriangle, label: 'Defaulter List' }
         ];
       case 'director': 
@@ -634,7 +644,28 @@ function App() {
     }
 
     if (activeTab === 'search') {
-      return <PatientSearchPanel patients={patients} patientSearchTerm={patientSearchTerm} setPatientSearchTerm={setPatientSearchTerm} onOpenConnectionModal={() => setIsConnectionModalOpen(true)} />;
+      return (
+        <PatientSearchPanel
+          patients={patients}
+          patientSearchTerm={patientSearchTerm}
+          setPatientSearchTerm={setPatientSearchTerm}
+          onOpenConnectionModal={() => setIsConnectionModalOpen(true)}
+          onOpenTimeline={(p) => setSelectedTimelinePatient(p)}
+        />
+      );
+    }
+
+    if (activeTab === 'geospatial') {
+      return (
+        <GeospatialTracingMap
+          patients={patients}
+          onOpenTimeline={(p) => setSelectedTimelinePatient(p)}
+        />
+      );
+    }
+
+    if (activeTab === 'cohort_analysis' || activeTab === 'cohort') {
+      return <CohortAnalysisDashboard />;
     }
 
     if (activeTab === 'defaulters') {
@@ -649,7 +680,7 @@ function App() {
     if (['exec', 'stakeholders', 'oversight', 'quality', 'communication'].includes(activeTab)) return <DirectorDashboard activeTab={activeTab} />;
     if (['workplan', 'meeting', 'risks', 'reporting', 'deliverables'].includes(activeTab)) return <ManagerDashboard activeTab={activeTab} />;
     if (['tracker_design', 'metadata', 'stages_elements', 'option_sets', 'rules', 'indicators'].includes(activeTab)) return <DHIS2Dashboard activeTab={activeTab} />;
-    if (['workflow', 'validation', 'logic', 'cohort', 'uat_support'].includes(activeTab)) return <InformaticsDashboard activeTab={activeTab} />;
+    if (['workflow', 'validation', 'logic', 'uat_support'].includes(activeTab)) return <InformaticsDashboard activeTab={activeTab} />;
     if (['review', 'test_plans', 'uat', 'audit', 'compliance'].includes(activeTab)) return <SecurityDashboard activeTab={activeTab} />;
     if (['materials', 'rollout', 'attendance', 'post_training'].includes(activeTab)) return <TrainingDashboard activeTab={activeTab} />;
     if (['logging', 'troubleshooting', 'tickets', 'sla'].includes(activeTab)) return <HelpdeskDashboard activeTab={activeTab} />;
@@ -1284,6 +1315,18 @@ function App() {
         onConfigChange={(newCfg) => setDhis2Config(newCfg)}
         onPatientsChange={(updatedPts) => setPatients(updatedPts)}
       />
+
+      {selectedTimelinePatient && (
+        <LongitudinalTimelineModal
+          patient={selectedTimelinePatient}
+          onClose={() => setSelectedTimelinePatient(null)}
+          onPatientUpdated={() => {
+            const latest = getStoredPatients();
+            setPatients(latest);
+            setSelectedTimelinePatient(latest.find(p => p.id === selectedTimelinePatient.id) || null);
+          }}
+        />
+      )}
 
       <PWAInstallBanner />
     </div>
