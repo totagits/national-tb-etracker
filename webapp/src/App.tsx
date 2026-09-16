@@ -169,7 +169,50 @@ const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm,
                 </div>
               </div>
               <div className="p-4 space-y-3">
-                {([['Age', `${selectedPatient.age} yrs`], ['Sex', selectedPatient.sex === 'M' ? 'Male' : 'Female'], ['Facility', selectedPatient.facility], ['Status', selectedPatient.status], ['TB Type', 'Pulmonary TB'], ['Regimen', '2HRZE/4HR']] as [string,any][]).map(([k, v]) => (
+                <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                  <span className="text-xs font-bold text-neutral-500 uppercase">Registration Mode</span>
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                    selectedPatient.regType === 'Facility Point-of-Care'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  }`}>
+                    {selectedPatient.regType === 'Facility Point-of-Care' ? 'Facility Point-of-Care' : 'Resident Geospatial'}
+                  </span>
+                </div>
+                {selectedPatient.regType === 'Facility Point-of-Care' ? (
+                  <>
+                    <div className="flex justify-between py-1.5 border-b border-neutral-100 text-xs">
+                      <span className="font-bold text-neutral-500 uppercase">Department</span>
+                      <span className="font-bold text-blue-700">{selectedPatient.facilityDepartment || 'OPD / Triage'}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-neutral-100 text-xs">
+                      <span className="font-bold text-neutral-500 uppercase">Facility Card #</span>
+                      <span className="font-mono font-bold text-neutral-800">{selectedPatient.facilityCardNumber || selectedPatient.id}</span>
+                    </div>
+                    {selectedPatient.reasonNoAddress && (
+                      <div className="flex justify-between py-1.5 border-b border-neutral-100 text-xs">
+                        <span className="font-bold text-neutral-500 uppercase">Address Status</span>
+                        <span className="text-amber-800 font-semibold bg-amber-50 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[160px]">
+                          {selectedPatient.reasonNoAddress}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between py-1.5 border-b border-neutral-100 text-xs">
+                      <span className="font-bold text-neutral-500 uppercase">Landmark</span>
+                      <span className="font-medium text-neutral-800 italic truncate max-w-[170px]" title={selectedPatient.landmark}>
+                        "{selectedPatient.landmark || 'Opposite cold storage'}"
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-neutral-100 text-xs">
+                      <span className="font-bold text-neutral-500 uppercase">Assigned gCHV</span>
+                      <span className="font-bold text-emerald-800">{selectedPatient.chwName || 'Community Volunteer'}</span>
+                    </div>
+                  </>
+                )}
+                {([['Age', `${selectedPatient.age} yrs`], ['Sex', selectedPatient.sex === 'M' ? 'Male' : 'Female'], ['Facility', selectedPatient.facility], ['Status', selectedPatient.status], ['TB Type', 'Pulmonary TB'], ['Regimen', selectedPatient.regimen || '2HRZE/4HR']] as [string,any][]).map(([k, v]) => (
                   <div key={k} className="flex justify-between py-2 border-b border-neutral-100 last:border-0">
                     <span className="text-xs font-bold text-neutral-500 uppercase">{k}</span>
                     <span className="text-sm font-bold text-neutral-800">{String(v)}</span>
@@ -230,13 +273,74 @@ const PatientSearchPanel = ({ patients, patientSearchTerm, setPatientSearchTerm,
               <div>
                 <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wide mb-3">Patient Demographics</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[['Age',`${chartPatient.age} years`],['Sex',chartPatient.sex==='M'?'Male':'Female'],['Facility',chartPatient.facility],['HIV Status','Negative'],['TB Type','Pulmonary TB'],['Regimen','2HRZE/4HR (Cat.1)'],['Enrolled','2026-01-25'],['Expected End','2026-07-25']].map(([k,v])=>(
+                  {[['Age',`${chartPatient.age} years`],['Sex',chartPatient.sex==='M'?'Male':'Female'],['Facility',chartPatient.facility],['HIV Status',chartPatient.hivStatus || 'Negative'],['TB Type','Pulmonary TB'],['Regimen',chartPatient.regimen || '2HRZE/4HR (Cat.1)'],['Enrolled',chartPatient.enrolledDate || '2026-01-25'],['Expected End','2026-07-25']].map(([k,v])=>(
                     <div key={k} className="bg-neutral-50 rounded-xl p-3 border border-neutral-100">
                       <p className="text-xs font-bold text-neutral-400 uppercase">{k}</p>
                       <p className="text-sm font-bold text-neutral-800 mt-0.5">{v}</p>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Dual Registration Protocol Profile */}
+              <div className={`p-4 rounded-xl border ${chartPatient.regType === 'Facility Point-of-Care' ? 'bg-blue-50/70 border-blue-200' : 'bg-emerald-50/70 border-emerald-200'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {chartPatient.regType === 'Facility Point-of-Care' ? (
+                      <Building2 className="h-4 w-4 text-blue-600" />
+                    ) : (
+                      <MapPin className="h-4 w-4 text-emerald-600" />
+                    )}
+                    <span className="text-xs font-black uppercase tracking-wider text-neutral-800">
+                      Registration Protocol: {chartPatient.regType === 'Facility Point-of-Care' ? 'Facility Point-of-Care (Clinical Triage)' : 'Resident & Community (Geospatial & GPS)'}
+                    </span>
+                  </div>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${chartPatient.regType === 'Facility Point-of-Care' ? 'bg-blue-200/80 text-blue-900 border border-blue-300' : 'bg-emerald-200/80 text-emerald-900 border border-emerald-300'}`}>
+                    {chartPatient.regType === 'Facility Point-of-Care' ? 'GPS Exempt · Hospital Ward' : 'WGS84 Georeferenced'}
+                  </span>
+                </div>
+
+                {chartPatient.regType === 'Facility Point-of-Care' ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-neutral-500 font-bold block">Department / Unit</span>
+                      <span className="font-semibold text-neutral-900">{chartPatient.facilityDepartment || 'Outpatient Department (OPD)'}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 font-bold block">Facility Card #</span>
+                      <span className="font-mono font-bold text-neutral-900">{chartPatient.facilityCardNumber || chartPatient.id}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 font-bold block">Attending Clinician</span>
+                      <span className="font-semibold text-neutral-900">{chartPatient.attendingClinician || 'Dr. Emmanuel Dennis'}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 font-bold block">Address Exemption</span>
+                      <span className="text-amber-800 font-semibold">{chartPatient.reasonNoAddress || 'Transient / Point-of-Care'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-neutral-500 font-bold block">GPS Coordinates</span>
+                      <span className="font-mono font-bold text-emerald-800">{chartPatient.lat || 6.3268}, {chartPatient.lng || -10.8122}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 font-bold block">County & Locality</span>
+                      <span className="font-semibold text-neutral-900">{chartPatient.county || 'Montserrado'} · {chartPatient.clan || 'West Point'}</span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 font-bold block">Landmark Direction</span>
+                      <span className="font-medium text-neutral-800 italic truncate block" title={chartPatient.landmark}>
+                        "{chartPatient.landmark || 'Opposite cold storage building'}"
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-neutral-500 font-bold block">Assigned gCHV</span>
+                      <span className="font-bold text-emerald-800">{chartPatient.chwName || 'Comfort Mulbah'} ({chartPatient.chwPhone || '+231-88-601-9922'})</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-wide mb-3">Treatment Progress</h3>

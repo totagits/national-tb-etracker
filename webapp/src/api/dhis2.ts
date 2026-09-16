@@ -72,6 +72,19 @@ export interface PatientRecord {
 
   // Longitudinal encounters
   encounters?: EncounterRecord[];
+
+  // Facility Point-of-Care / Clinical Triage fields
+  facilityDepartment?: string;
+  facilityCardNumber?: string;
+  admissionType?: string;
+  attendingClinician?: string;
+  clinicianCadre?: string;
+  triagePriority?: string;
+  triageTemp?: number;
+  triageBp?: string;
+  triagePulse?: number;
+  triageSpo2?: number;
+  reasonNoAddress?: string;
 }
 
 const CONFIG_STORAGE_KEY = 'tb_etracker_dhis2_config';
