@@ -9,8 +9,17 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pwa-192.png', 'pwa-512.png', 'apple-touch-icon.png', 'assets/**/*'],
+      includeAssets: [
+        'pwa-192.png',
+        'pwa-512.png',
+        'pwa-maskable-192.png',
+        'pwa-maskable-512.png',
+        'apple-touch-icon.png',
+        'favicon.ico',
+        'assets/**/*'
+      ],
       manifest: {
+        id: '/national-tb-etracker/',
         name: 'TB e-Tracker - Liberia National HMIS',
         short_name: 'TB e-Tracker',
         description: 'Liberia National Tuberculosis e-Tracker built on DHIS2. Real-time TB surveillance, patient tracking, and treatment outcome monitoring across all 15 counties.',
@@ -18,8 +27,8 @@ export default defineConfig({
         background_color: '#0f172a',
         display: 'standalone',
         orientation: 'any',
-        scope: '/',
-        start_url: '/',
+        scope: '/national-tb-etracker/',
+        start_url: '/national-tb-etracker/',
         lang: 'en',
         categories: ['health', 'medical', 'productivity'],
         icons: [
@@ -27,14 +36,26 @@ export default defineConfig({
             src: 'pwa-192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any'
+          },
+          {
+            src: 'pwa-maskable-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
           },
           {
             src: 'pwa-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable',
+            purpose: 'any'
           },
+          {
+            src: 'pwa-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
         ],
         screenshots: [
           {

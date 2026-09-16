@@ -118,9 +118,19 @@ export function PWAInstallBanner() {
                 ))}
               </div>
 
+              {/* Direct One-Touch Install if Prompt Available */}
+              {deferredPrompt && (
+                <button
+                  onClick={handleInstallClick}
+                  className="mb-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98"
+                >
+                  <Download className="h-5 w-5" /> Install App Directly Now
+                </button>
+              )}
+
               {/* Steps */}
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                {isIOS ? 'Steps for iPhone / iPad' : isAndroid ? 'Steps for Android' : 'Installation Steps'}
+                {isIOS ? 'Steps for iPhone / iPad' : isAndroid ? 'Steps for Android (Google Chrome)' : 'Installation Steps'}
               </p>
 
               {isAndroid && (
@@ -128,20 +138,20 @@ export function PWAInstallBanner() {
                   {[
                     {
                       num: 1,
-                      title: 'Tap the menu icon',
-                      detail: 'Tap the ⋮ three-dot menu in the top-right corner of Chrome',
+                      title: 'Tap the Chrome menu (⋮)',
+                      detail: 'Tap the three-dot menu in the top-right corner of Google Chrome',
                       icon: <Menu className="h-4 w-4" />,
                     },
                     {
                       num: 2,
-                      title: 'Tap "Add to Home screen"',
-                      detail: 'Scroll down in the menu and tap "Add to Home screen"',
+                      title: 'Tap "Install app" or "Add to Home screen"',
+                      detail: 'Chrome will display "Install app" with the official MoH TB e-Tracker icon',
                       icon: <Download className="h-4 w-4" />,
                     },
                     {
                       num: 3,
-                      title: 'Tap "Add"',
-                      detail: 'A dialog will appear — tap "Add" to confirm installation',
+                      title: 'Tap "Install"',
+                      detail: 'Android will compile and install the WebAPK directly to your App Drawer and Home screen for offline access',
                       icon: <CheckCircle2 className="h-4 w-4" />,
                     },
                   ].map(step => (
@@ -160,7 +170,7 @@ export function PWAInstallBanner() {
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
                     <span className="text-lg flex-shrink-0">💡</span>
                     <p className="text-xs text-amber-800 font-medium">
-                      If you don't see "Add to Home screen", make sure you're using <strong>Google Chrome</strong> (not Samsung Internet or another browser).
+                      If you don't see "Install app", make sure you are opening the link in <strong>Google Chrome</strong> (not in-app browsers like WhatsApp, Facebook, or Samsung Internet).
                     </p>
                   </div>
                 </div>
