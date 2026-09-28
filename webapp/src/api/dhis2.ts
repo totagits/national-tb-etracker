@@ -105,11 +105,11 @@ export interface OutboundNotification {
   patientName: string;
   type: 'SMS' | 'EMAIL';
   recipient: string;
-  carrier?: 'Orange Liberia' | 'Lonestar Cell MTN' | 'MoH Mail Relay';
+  carrier?: string;
   subject?: string;
   message: string;
   temporaryPin: string;
-  status: 'Delivered' | 'Sent' | 'Queued' | 'Failed';
+  status: 'Delivered' | 'Sent' | 'Queued' | 'Failed' | 'Pending';
   timestamp: string;
   portalUrl?: string;
 }

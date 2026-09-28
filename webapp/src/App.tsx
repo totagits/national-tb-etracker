@@ -13,6 +13,7 @@ import { ProgramIndicatorsDashboard } from './components/ProgramIndicatorsDashbo
 import { RegistrationWizard } from './components/RegistrationWizard';
 import { PWAInstallBanner } from './components/PWAInstall';
 import { DHIS2ConnectionModal } from './components/DHIS2ConnectionModal';
+import { GatewayConnectionModal } from './components/GatewayConnectionModal';
 import { LongitudinalTimelineModal } from './components/LongitudinalTimelineModal';
 import { GeospatialTracingMap } from './components/GeospatialTracingMap';
 import { CohortAnalysisDashboard } from './components/CohortAnalysisDashboard';
@@ -27,6 +28,7 @@ import {
   type DHIS2Config,
   type PatientRecord
 } from './api/dhis2';
+import { getGatewayConfig, type GatewayConfig } from './api/gateway';
 
 // Base URL for assets — resolves to '/national-tb-etracker/' on GitHub Pages, '/' in dev
 const B = import.meta.env.BASE_URL;
@@ -567,6 +569,8 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dhis2Config, setDhis2Config] = useState<DHIS2Config>(getDHIS2Config);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
+  const [gatewayConfig, setGatewayConfig] = useState<GatewayConfig>(getGatewayConfig);
+  const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
   const [patients, setPatients] = useState<PatientRecord[]>(getStoredPatients);
   const [activePatient, setActivePatient] = useState<PatientRecord>(() => {
     const list = getStoredPatients();
@@ -724,7 +728,7 @@ function App() {
           <p className="text-[10px] text-health-blue uppercase tracking-widest font-semibold">Republic of Liberia</p>
         </div>
       </div>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3 sm:space-x-4">
         <button
           onClick={() => setIsConnectionModalOpen(true)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
@@ -738,6 +742,20 @@ function App() {
             dhis2Config.mode === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
           }`} />
           <span>{dhis2Config.mode === 'live' ? 'Live DHIS2 API' : 'Demo & Training Mode'}</span>
+        </button>
+        <button
+          onClick={() => setIsGatewayModalOpen(true)}
+          className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+            gatewayConfig.mode === 'live'
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+              : 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100'
+          }`}
+          title="Configure SMS & Email Telecommunications Gateway"
+        >
+          <span className={`h-2 w-2 rounded-full ${
+            gatewayConfig.mode === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'
+          }`} />
+          <span>{gatewayConfig.mode === 'live' ? 'Live Telecom Gateway' : 'Simulated Gateway'}</span>
         </button>
         <button onClick={() => setView('about')} className={`text-sm font-medium transition-colors ${view === 'about' ? 'text-health-blue' : 'text-neutral-600 hover:text-health-blue'}`}>About Platform</button>
         <button onClick={() => setView('docs')} className={`text-sm font-medium transition-colors ${view === 'docs' ? 'text-health-blue' : 'text-neutral-600 hover:text-health-blue'}`}>Documentation</button>
@@ -763,6 +781,7 @@ function App() {
         <RegistrationWizard
           facilities={facilities}
           onRegister={handleRegisterPatient}
+          onOpenGatewayModal={() => setIsGatewayModalOpen(true)}
           onTestPatientPortal={(newPatient) => {
             setActivePatient(newPatient);
             setSelectedRoleId('patient');
@@ -1412,6 +1431,20 @@ function App() {
               <span>{dhis2Config.mode === 'live' ? 'Live DHIS2' : 'Demo Mode'}</span>
             </button>
             <button
+              onClick={() => setIsGatewayModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                gatewayConfig.mode === 'live'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100'
+              }`}
+              title="Click to manage Live SMS & Email Telecommunications Gateway"
+            >
+              <span className={`h-2 w-2 rounded-full ${
+                gatewayConfig.mode === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'
+              }`} />
+              <span>{gatewayConfig.mode === 'live' ? 'Live Gateway' : 'Simulated Gateway'}</span>
+            </button>
+            <button
               onClick={() => setView('login')}
               className="md:hidden flex items-center justify-center h-9 w-9 rounded-xl bg-neutral-100 text-neutral-500"
               aria-label="Logout"
@@ -1477,6 +1510,12 @@ function App() {
         onClose={() => setIsConnectionModalOpen(false)}
         onConfigChange={(newCfg) => setDhis2Config(newCfg)}
         onPatientsChange={(updatedPts) => setPatients(updatedPts)}
+      />
+
+      <GatewayConnectionModal
+        isOpen={isGatewayModalOpen}
+        onClose={() => setIsGatewayModalOpen(false)}
+        onConfigChange={(newCfg) => setGatewayConfig(newCfg)}
       />
 
       {selectedTimelinePatient && (

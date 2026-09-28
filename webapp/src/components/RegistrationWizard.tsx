@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ArrowRight, ArrowLeft, CheckCircle2, UserPlus, Stethoscope,
   HeartPulse, Pill, MapPin, Building2, Locate, Bot, Save,
-  Mail, Smartphone, Sparkles, Send
+  Mail, Smartphone, Sparkles, Send, AlertTriangle
 } from 'lucide-react';
 import { ALL_COUNTIES } from '../data/liberiaData';
 import {
@@ -10,15 +10,23 @@ import {
   type OutboundNotification,
   type PatientRecord
 } from '../api/dhis2';
+import {
+  getGatewayConfig,
+  sendLiveEmail,
+  sendLiveSMS,
+  type DispatchResult
+} from '../api/gateway';
 
 export const RegistrationWizard = ({
   facilities,
   onRegister,
-  onTestPatientPortal
+  onTestPatientPortal,
+  onOpenGatewayModal
 }: {
   facilities: string[];
   onRegister: (p: any) => void;
   onTestPatientPortal?: (p: PatientRecord) => void;
+  onOpenGatewayModal?: () => void;
 }) => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,6 +36,10 @@ export const RegistrationWizard = ({
   const [lastRegisteredPatient, setLastRegisteredPatient] = useState<PatientRecord | null>(null);
   const [activeNotificationTab, setActiveNotificationTab] = useState<'sms' | 'email'>('sms');
   const [isResending, setIsResending] = useState(false);
+  const [liveDispatchResults, setLiveDispatchResults] = useState<{
+    email?: DispatchResult;
+    sms?: DispatchResult;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     // Step 1: Demographics & Dual Registration (PS-01)
@@ -150,129 +162,197 @@ export const RegistrationWizard = ({
     }, 1500);
   };
   
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setStep(5);
-      const generatedId = `TB-${Math.floor(1050 + Math.random() * 8900)}`;
-      const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
-      const isResident = formData.regType === 'Resident Geospatial';
-      const patientPhone = formData.phone.trim() || '+231-77-512-3401';
-      const patientEmail = formData.email.trim() || `${(formData.firstName || 'patient').toLowerCase()}.${(formData.lastName || 'doe').toLowerCase()}@tb-care.gov.lr`;
-      const carrier = (patientPhone.includes('88') || patientPhone.startsWith('088')) ? 'Orange Liberia' : 'Lonestar Cell MTN';
+    const generatedId = `TB-${Math.floor(1050 + Math.random() * 8900)}`;
+    const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
+    const isResident = formData.regType === 'Resident Geospatial';
+    const patientPhone = formData.phone.trim() || '+231-77-512-3401';
+    const patientEmail = formData.email.trim() || `${(formData.firstName || 'patient').toLowerCase()}.${(formData.lastName || 'doe').toLowerCase()}@tb-care.gov.lr`;
+    const carrier = (patientPhone.includes('88') || patientPhone.startsWith('088')) ? 'Orange Liberia' : 'Lonestar Cell MTN';
 
-      const newPatient: PatientRecord = {
-        id: generatedId,
-        name: `${formData.firstName} ${formData.lastName}`.trim() || 'Michael Gwoah',
-        age: formData.age,
-        sex: formData.sex.charAt(0),
-        facility: formData.facility,
-        status: 'On Treatment',
-        hivStatus: formData.hivStatus,
-        regimen: formData.regimen,
-        enrolledDate: new Date().toISOString().slice(0, 10),
-        regType: formData.regType,
-        lat: isResident ? formData.lat : undefined,
-        lng: isResident ? formData.lng : undefined,
-        accuracyMeters: isResident ? formData.accuracyMeters : undefined,
-        county: isResident ? formData.county : (formData.facility.split('(')[1]?.replace(')', '').trim() || 'Montserrado'),
-        district: isResident ? formData.district : undefined,
-        clan: isResident ? formData.clan : undefined,
-        community: isResident ? formData.community : undefined,
-        landmark: isResident ? formData.landmark : `Point of Care: ${formData.facilityDepartment} (Card #${formData.facilityCardNumber})`,
-        phone: patientPhone,
-        email: patientEmail,
-        temporaryPin: generatedPin,
-        isActivated: false,
-        adherenceStreakDays: 1,
-        chwName: isResident ? formData.chwName : undefined,
-        chwPhone: isResident ? formData.chwPhone : undefined,
-        chwPost: isResident ? formData.chwPost : undefined,
-        householdContacts: isResident ? formData.householdContacts : 0,
-        under5Contacts: isResident ? formData.under5Contacts : 0,
-        facilityDepartment: formData.facilityDepartment,
-        facilityCardNumber: formData.facilityCardNumber,
-        admissionType: formData.admissionType,
-        attendingClinician: formData.attendingClinician,
-        clinicianCadre: formData.clinicianCadre,
-        triagePriority: formData.triagePriority,
-        triageTemp: formData.triageTemp,
-        triageBp: formData.triageBp,
-        triagePulse: formData.triagePulse,
-        triageSpo2: formData.triageSpo2,
-        reasonNoAddress: formData.reasonNoAddress,
-        appointmentStatus: 'On Schedule',
-        encounters: [
-          {
-            id: `ENC-${Date.now().toString().slice(-4)}`,
-            stage: 'PS-01 Enrollment & PS-04 Initiation',
-            date: new Date().toISOString().slice(0, 10),
-            weightKg: formData.weightKg,
-            sputumSmear: 'Positive',
-            adherenceRate: 100,
-            dotType: formData.dotModel as any,
-            notes: isResident
-              ? `Resident registration with GPS & landmark locator. GeneXpert: ${formData.geneXpertResult}. Assigned to CHW ${formData.chwName}.`
-              : `Facility clinical triage registration at ${formData.facilityDepartment}. Card #${formData.facilityCardNumber}. Attending: ${formData.attendingClinician} (${formData.clinicianCadre}). Triage: Temp ${formData.triageTemp}°C, BP ${formData.triageBp}, SpO2 ${formData.triageSpo2}%. Reason: ${formData.reasonNoAddress}.`,
-            provider: isResident ? 'Facility Clinician & Community gCHV' : `${formData.attendingClinician} (${formData.clinicianCadre})`
-          }
-        ]
-      };
+    const newPatient: PatientRecord = {
+      id: generatedId,
+      name: `${formData.firstName} ${formData.lastName}`.trim() || 'Michael Gwoah',
+      age: formData.age,
+      sex: formData.sex.charAt(0) as any,
+      facility: formData.facility,
+      status: 'On Treatment',
+      hivStatus: formData.hivStatus,
+      regimen: formData.regimen,
+      enrolledDate: new Date().toISOString().slice(0, 10),
+      regType: formData.regType,
+      lat: isResident ? formData.lat : undefined,
+      lng: isResident ? formData.lng : undefined,
+      accuracyMeters: isResident ? formData.accuracyMeters : undefined,
+      county: isResident ? formData.county : (formData.facility.split('(')[1]?.replace(')', '').trim() || 'Montserrado'),
+      district: isResident ? formData.district : undefined,
+      clan: isResident ? formData.clan : undefined,
+      community: isResident ? formData.community : undefined,
+      landmark: isResident ? formData.landmark : `Point of Care: ${formData.facilityDepartment} (Card #${formData.facilityCardNumber})`,
+      phone: patientPhone,
+      email: patientEmail,
+      temporaryPin: generatedPin,
+      isActivated: false,
+      adherenceStreakDays: 1,
+      chwName: isResident ? formData.chwName : undefined,
+      chwPhone: isResident ? formData.chwPhone : undefined,
+      chwPost: isResident ? formData.chwPost : undefined,
+      householdContacts: isResident ? formData.householdContacts : 0,
+      under5Contacts: isResident ? formData.under5Contacts : 0,
+      facilityDepartment: formData.facilityDepartment,
+      facilityCardNumber: formData.facilityCardNumber,
+      admissionType: formData.admissionType,
+      attendingClinician: formData.attendingClinician,
+      clinicianCadre: formData.clinicianCadre,
+      triagePriority: formData.triagePriority,
+      triageTemp: formData.triageTemp,
+      triageBp: formData.triageBp,
+      triagePulse: formData.triagePulse,
+      triageSpo2: formData.triageSpo2,
+      reasonNoAddress: formData.reasonNoAddress,
+      appointmentStatus: 'On Schedule',
+      encounters: [
+        {
+          id: `ENC-${Date.now().toString().slice(-4)}`,
+          stage: 'PS-01 Enrollment & PS-04 Initiation',
+          date: new Date().toISOString().slice(0, 10),
+          weightKg: formData.weightKg,
+          sputumSmear: 'Positive',
+          adherenceRate: 100,
+          dotType: formData.dotModel as any,
+          notes: isResident
+            ? `Resident registration with GPS & landmark locator. GeneXpert: ${formData.geneXpertResult}. Assigned to CHW ${formData.chwName}.`
+            : `Facility clinical triage registration at ${formData.facilityDepartment}. Card #${formData.facilityCardNumber}. Attending: ${formData.attendingClinician} (${formData.clinicianCadre}). Triage: Temp ${formData.triageTemp}°C, BP ${formData.triageBp}, SpO2 ${formData.triageSpo2}%. Reason: ${formData.reasonNoAddress}.`,
+          provider: isResident ? 'Facility Clinician & Community gCHV' : `${formData.attendingClinician} (${formData.clinicianCadre})`
+        }
+      ]
+    };
 
-      // Dispatch SMS via simulated Lonestar Cell MTN / Orange Liberia Gateway
-      const smsNotif: OutboundNotification = {
-        id: `NOTIF-SMS-${Date.now().toString().slice(-4)}`,
-        patientId: generatedId,
-        patientName: newPatient.name,
-        type: 'SMS',
-        recipient: patientPhone,
-        carrier,
-        message: `MoH Liberia NLTCP: Welcome ${formData.firstName || 'Patient'}! You are enrolled in the National TB e-Tracker (ID: ${generatedId}). Temp Portal PIN: ${generatedPin}. Log in at https://totagits.github.io/national-tb-etracker/ to activate your care account. For help, call toll-free 4455.`,
-        temporaryPin: generatedPin,
-        status: 'Delivered',
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19)
-      };
-      saveOutboundNotification(smsNotif);
+    // Check Gateway Configuration (Live or Simulated)
+    const gwConfig = getGatewayConfig();
+    let liveSmsRes: DispatchResult | undefined;
+    let liveEmailRes: DispatchResult | undefined;
 
-      // Dispatch Email via simulated MoH Mail Relay
-      const emailNotif: OutboundNotification = {
-        id: `NOTIF-EML-${Date.now().toString().slice(-4)}`,
-        patientId: generatedId,
-        patientName: newPatient.name,
-        type: 'EMAIL',
-        recipient: patientEmail,
-        carrier: 'MoH Mail Relay',
-        subject: 'Ministry of Health Liberia: National TB e-Tracker Enrollment & Account Activation',
-        message: `Welcome to the National TB e-Tracker platform. Your patient profile ${generatedId} has been created at ${formData.facility}. Please activate your My TB Care portal using temporary PIN: ${generatedPin}.`,
-        temporaryPin: generatedPin,
-        status: 'Delivered',
-        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-        portalUrl: 'https://totagits.github.io/national-tb-etracker/'
-      };
-      saveOutboundNotification(emailNotif);
-
-      setLastRegisteredPatient(newPatient);
-      onRegister(newPatient);
-
-      if ((window as any).showToast) {
-        (window as any).showToast(`Patient ${generatedId} registered! SMS sent via ${carrier} & welcome email dispatched.`);
+    if (gwConfig.mode === 'live') {
+      try {
+        liveEmailRes = await sendLiveEmail(
+          patientEmail,
+          newPatient.name,
+          generatedId,
+          generatedPin,
+          formData.facility,
+          gwConfig
+        );
+      } catch (e: any) {
+        liveEmailRes = { success: false, message: e.message, provider: gwConfig.emailProvider, timestamp: new Date().toISOString() };
       }
-    }, 1200);
+
+      try {
+        liveSmsRes = await sendLiveSMS(
+          patientPhone,
+          `MoH Liberia NLTCP: Welcome ${formData.firstName || 'Patient'}! You are enrolled in the National TB e-Tracker (ID: ${generatedId}). Temp Portal PIN: ${generatedPin}. Log in at https://totagits.github.io/national-tb-etracker/ to activate your care account. For help, call toll-free 4455.`,
+          gwConfig
+        );
+      } catch (e: any) {
+        liveSmsRes = { success: false, message: e.message, provider: gwConfig.smsProvider, timestamp: new Date().toISOString() };
+      }
+
+      setLiveDispatchResults({ email: liveEmailRes, sms: liveSmsRes });
+    }
+
+    // Dispatch SMS Notification Record
+    const smsNotif: OutboundNotification = {
+      id: `NOTIF-SMS-${Date.now().toString().slice(-4)}`,
+      patientId: generatedId,
+      patientName: newPatient.name,
+      type: 'SMS',
+      recipient: patientPhone,
+      carrier: gwConfig.mode === 'live' ? (liveSmsRes?.provider || carrier) : carrier,
+      message: `MoH Liberia NLTCP: Welcome ${formData.firstName || 'Patient'}! You are enrolled in the National TB e-Tracker (ID: ${generatedId}). Temp Portal PIN: ${generatedPin}. Log in at https://totagits.github.io/national-tb-etracker/ to activate your care account. For help, call toll-free 4455.`,
+      temporaryPin: generatedPin,
+      status: gwConfig.mode === 'live' ? (liveSmsRes?.success ? 'Delivered' : 'Pending') : 'Delivered',
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19)
+    };
+    saveOutboundNotification(smsNotif);
+
+    // Dispatch Email Notification Record
+    const emailNotif: OutboundNotification = {
+      id: `NOTIF-EML-${Date.now().toString().slice(-4)}`,
+      patientId: generatedId,
+      patientName: newPatient.name,
+      type: 'EMAIL',
+      recipient: patientEmail,
+      carrier: gwConfig.mode === 'live' ? (liveEmailRes?.provider || 'MoH Mail Relay') : 'MoH Mail Relay',
+      subject: 'Ministry of Health Liberia: National TB e-Tracker Enrollment & Account Activation',
+      message: `Welcome to the National TB e-Tracker platform. Your patient profile ${generatedId} has been created at ${formData.facility}. Please activate your My TB Care portal using temporary PIN: ${generatedPin}.`,
+      temporaryPin: generatedPin,
+      status: gwConfig.mode === 'live' ? (liveEmailRes?.success ? 'Delivered' : 'Pending') : 'Delivered',
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      portalUrl: 'https://totagits.github.io/national-tb-etracker/'
+    };
+    saveOutboundNotification(emailNotif);
+
+    setLastRegisteredPatient(newPatient);
+    onRegister(newPatient);
+    setIsSubmitting(false);
+    setStep(5);
+
+    if ((window as any).showToast) {
+      if (gwConfig.mode === 'live') {
+        (window as any).showToast(`Patient ${generatedId} registered! Live notifications dispatched (SMS & Email).`);
+      } else {
+        (window as any).showToast(`Patient ${generatedId} registered! SMS queued via ${carrier} & welcome email dispatched.`);
+      }
+    }
   };
 
-  const handleResendNotification = (type: 'sms' | 'email') => {
+  const handleResendNotification = async (type: 'sms' | 'email') => {
     setIsResending(true);
-    setTimeout(() => {
-      setIsResending(false);
-      if ((window as any).showToast) {
-        (window as any).showToast(
-          type === 'sms'
-            ? 'SMS alert re-dispatched via Liberian GSM gateway (ACK 200 Delivered).'
-            : 'Welcome email re-dispatched via MoH secure mail relay.'
+    const gwConfig = getGatewayConfig();
+    const patientPhone = formData.phone || '+231-77-512-3401';
+    const patientEmail = formData.email || `${(formData.firstName || 'patient').toLowerCase()}.${(formData.lastName || 'doe').toLowerCase()}@tb-care.gov.lr`;
+    const tempPin = lastRegisteredPatient?.temporaryPin || '4892';
+    const patientId = lastRegisteredPatient?.id || 'TB-2026';
+    const patientName = `${formData.firstName} ${formData.lastName}`.trim() || 'Patient';
+
+    if (gwConfig.mode === 'live') {
+      if (type === 'sms') {
+        const res = await sendLiveSMS(
+          patientPhone,
+          `MoH Liberia NLTCP: Welcome ${formData.firstName || 'Patient'}! You are enrolled in the National TB e-Tracker (ID: ${patientId}). Temp Portal PIN: ${tempPin}. Log in at https://totagits.github.io/national-tb-etracker/ to activate your care account. For help, call toll-free 4455.`,
+          gwConfig
         );
+        setLiveDispatchResults(prev => ({ ...prev, sms: res }));
+        if ((window as any).showToast) {
+          (window as any).showToast(res.success ? `Live SMS Delivered: ${res.message}` : `SMS Gateway: ${res.message}`);
+        }
+      } else {
+        const res = await sendLiveEmail(
+          patientEmail,
+          patientName,
+          patientId,
+          tempPin,
+          formData.facility,
+          gwConfig
+        );
+        setLiveDispatchResults(prev => ({ ...prev, email: res }));
+        if ((window as any).showToast) {
+          (window as any).showToast(res.success ? `Live Email Delivered: ${res.message}` : `Email Gateway: ${res.message}`);
+        }
       }
-    }, 800);
+    } else {
+      setTimeout(() => {
+        if ((window as any).showToast) {
+          (window as any).showToast(
+            type === 'sms'
+              ? 'SMS alert re-dispatched via Liberian GSM gateway (Simulated ACK 200 Delivered).'
+              : 'Welcome email re-dispatched via MoH secure mail relay.'
+          );
+        }
+      }, 600);
+    }
+    setIsResending(false);
   };
 
   const handleReset = () => {
@@ -311,6 +391,7 @@ export const RegistrationWizard = ({
   };
 
   if (step === 5) {
+    const gwConfig = getGatewayConfig();
     const isResident = formData.regType === 'Resident Geospatial';
     const patientPhone = formData.phone || '+231-77-512-3401';
     const patientEmail = formData.email || `${(formData.firstName || 'patient').toLowerCase()}.${(formData.lastName || 'doe').toLowerCase()}@tb-care.gov.lr`;
@@ -356,10 +437,23 @@ export const RegistrationWizard = ({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Gateway Delivered
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 border ${
+                  gwConfig.mode === 'live'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-400/30'
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${gwConfig.mode === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  {gwConfig.mode === 'live' ? 'Live Telecommunications Gateway' : 'Simulated Gateway Mode'}
                 </span>
+                {onOpenGatewayModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenGatewayModal}
+                    className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg border border-white/20 transition-colors"
+                  >
+                    Configure Gateway
+                  </button>
+                )}
               </div>
             </div>
 
@@ -395,59 +489,108 @@ export const RegistrationWizard = ({
             <div className="p-5 bg-white">
               {activeNotificationTab === 'sms' ? (
                 /* SMS Preview (Mobile Screen Simulation) */
-                <div className="max-w-md mx-auto bg-neutral-900 rounded-3xl p-3 shadow-xl border-4 border-neutral-800 text-neutral-100">
-                  {/* Phone Status Bar */}
-                  <div className="flex items-center justify-between text-[10px] text-neutral-400 px-3 pb-2 border-b border-neutral-800">
-                    <span className="font-semibold">{carrier} 4G</span>
-                    <span className="font-mono">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-
-                  {/* SMS Thread Header */}
-                  <div className="py-2.5 px-3 flex items-center gap-2 border-b border-neutral-800/80">
-                    <div className="h-7 w-7 rounded-full bg-health-blue flex items-center justify-center font-black text-xs text-white">
-                      MOH
+                <div className="max-w-md mx-auto space-y-3">
+                  {liveDispatchResults?.sms && (
+                    <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                      liveDispatchResults.sms.success
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-amber-50 border-amber-300 text-amber-900'
+                    }`}>
+                      <div>
+                        <div className="font-bold flex items-center gap-1.5">
+                          {liveDispatchResults.sms.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          )}
+                          <span>Live SMS Gateway: {liveDispatchResults.sms.provider}</span>
+                        </div>
+                        <p className="text-[11px] mt-1 leading-normal">{liveDispatchResults.sms.message}</p>
+                      </div>
+                      <span className="font-mono font-bold text-[10px] px-2 py-0.5 bg-white rounded border border-neutral-300 ml-2 whitespace-nowrap">
+                        HTTP {liveDispatchResults.sms.statusCode || 200}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-xs font-bold text-white block">MOH-NLTCP</span>
-                      <span className="text-[10px] text-emerald-400">Verified Health Sender</span>
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Message Bubble */}
-                  <div className="p-3 my-3">
-                    <div className="bg-neutral-800 rounded-2xl rounded-tl-xs p-3.5 text-xs space-y-2 text-neutral-200 leading-relaxed shadow-sm">
-                      <p>
-                        <strong>MoH Liberia NLTCP:</strong> Welcome {formData.firstName || 'Patient'}! You have been enrolled in the National TB e-Tracker at {formData.facility}.
-                      </p>
-                      <p className="bg-neutral-900/90 p-2 rounded-lg font-mono text-xs border border-neutral-700">
-                        TB ID: <span className="text-blue-300 font-bold">{patientId}</span><br />
-                        Temp PIN: <span className="text-amber-400 font-black text-sm">{tempPin}</span>
-                      </p>
-                      <p className="text-[11px] text-neutral-300">
-                        Log in at <span className="text-blue-400 underline">https://totagits.github.io/national-tb-etracker/</span> to activate your care account. For questions, call toll-free <strong className="text-amber-400">4455</strong>.
-                      </p>
-                      <div className="text-[9px] text-neutral-500 text-right">Just now · Delivered</div>
+                  <div className="bg-neutral-900 rounded-3xl p-3 shadow-xl border-4 border-neutral-800 text-neutral-100">
+                    {/* Phone Status Bar */}
+                    <div className="flex items-center justify-between text-[10px] text-neutral-400 px-3 pb-2 border-b border-neutral-800">
+                      <span className="font-semibold">{carrier} 4G</span>
+                      <span className="font-mono">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
-                  </div>
 
-                  <div className="flex justify-between items-center text-[11px] text-neutral-400 px-3 pt-1">
-                    <span>Target: {patientPhone}</span>
-                    <button
-                      type="button"
-                      disabled={isResending}
-                      onClick={() => handleResendNotification('sms')}
-                      className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
-                    >
-                      <Send className="h-3 w-3" />
-                      <span>{isResending ? 'Resending...' : 'Resend SMS'}</span>
-                    </button>
+                    {/* SMS Thread Header */}
+                    <div className="py-2.5 px-3 flex items-center gap-2 border-b border-neutral-800/80">
+                      <div className="h-7 w-7 rounded-full bg-health-blue flex items-center justify-center font-black text-xs text-white">
+                        MOH
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white block">MOH-NLTCP</span>
+                        <span className="text-[10px] text-emerald-400">Verified Health Sender</span>
+                      </div>
+                    </div>
+
+                    {/* Message Bubble */}
+                    <div className="p-3 my-3">
+                      <div className="bg-neutral-800 rounded-2xl rounded-tl-xs p-3.5 text-xs space-y-2 text-neutral-200 leading-relaxed shadow-sm">
+                        <p>
+                          <strong>MoH Liberia NLTCP:</strong> Welcome {formData.firstName || 'Patient'}! You have been enrolled in the National TB e-Tracker at {formData.facility}.
+                        </p>
+                        <p className="bg-neutral-900/90 p-2 rounded-lg font-mono text-xs border border-neutral-700">
+                          TB ID: <span className="text-blue-300 font-bold">{patientId}</span><br />
+                          Temp PIN: <span className="text-amber-400 font-black text-sm">{tempPin}</span>
+                        </p>
+                        <p className="text-[11px] text-neutral-300">
+                          Log in at <span className="text-blue-400 underline">https://totagits.github.io/national-tb-etracker/</span> to activate your care account. For questions, call toll-free <strong className="text-amber-400">4455</strong>.
+                        </p>
+                        <div className="text-[9px] text-neutral-500 text-right">Just now · Delivered</div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px] text-neutral-400 px-3 pt-1">
+                      <span>Target: {patientPhone}</span>
+                      <button
+                        type="button"
+                        disabled={isResending}
+                        onClick={() => handleResendNotification('sms')}
+                        className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
+                      >
+                        <Send className="h-3 w-3" />
+                        <span>{isResending ? 'Resending...' : 'Resend SMS'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
                 /* Email Letterhead Preview */
-                <div className="max-w-xl mx-auto border border-neutral-300 rounded-xl overflow-hidden bg-neutral-50/30 text-xs shadow-sm">
-                  {/* Official MoH Header */}
-                  <div className="bg-white border-b-2 border-health-blue p-5 text-center space-y-1">
+                <div className="max-w-xl mx-auto space-y-3">
+                  {liveDispatchResults?.email && (
+                    <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                      liveDispatchResults.email.success
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-amber-50 border-amber-300 text-amber-900'
+                    }`}>
+                      <div>
+                        <div className="font-bold flex items-center gap-1.5">
+                          {liveDispatchResults.email.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          )}
+                          <span>Live Email Gateway: {liveDispatchResults.email.provider}</span>
+                        </div>
+                        <p className="text-[11px] mt-1 leading-normal">{liveDispatchResults.email.message}</p>
+                      </div>
+                      <span className="font-mono font-bold text-[10px] px-2 py-0.5 bg-white rounded border border-neutral-300 ml-2 whitespace-nowrap">
+                        HTTP {liveDispatchResults.email.statusCode || 200}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="border border-neutral-300 rounded-xl overflow-hidden bg-neutral-50/30 text-xs shadow-sm">
+                    {/* Official MoH Header */}
+                    <div className="bg-white border-b-2 border-health-blue p-5 text-center space-y-1">
                     <div className="font-serif uppercase tracking-widest text-[11px] text-neutral-500 font-bold">
                       Republic of Liberia · Ministry of Health
                     </div>
@@ -490,9 +633,10 @@ export const RegistrationWizard = ({
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
+        </div>
 
           {/* Action CTAs */}
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
