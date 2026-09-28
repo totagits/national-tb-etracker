@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react';
 import {
   ShieldCheck, XCircle, CheckCircle2, Clock,
   Search, Download, RefreshCw, ChevronDown, ChevronRight, X,
+  Smartphone, Mail
 } from 'lucide-react';
 import { AUDIT_LOGS } from '../data/liberiaData';
+import { getStoredNotifications } from '../api/dhis2';
 
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -18,6 +20,9 @@ const statusColor: Record<string, string> = {
   SUCCESS:      'bg-green-100 text-green-700 border-green-200',
   BLOCKED:      'bg-red-100 text-red-700 border-red-200',
   WARNING:      'bg-amber-100 text-amber-700 border-amber-200',
+  Delivered:    'bg-green-100 text-green-700 border-green-200',
+  Sent:         'bg-blue-100 text-blue-700 border-blue-200',
+  Queued:       'bg-amber-100 text-amber-700 border-amber-200',
   Open:         'bg-red-100 text-red-700 border-red-200',
   'In Progress':'bg-blue-100 text-blue-700 border-blue-200',
   Fixed:        'bg-green-100 text-green-700 border-green-200',
@@ -370,8 +375,11 @@ const UATTab = () => {
 // TAB: Audit Log
 // ─────────────────────────────────────────────────────────────────────────────
 const AuditTab = () => {
+  const [subView, setSubView] = useState<'access' | 'notifications'>('access');
   const [query, setQuery] = useState('');
-  const filtered = useMemo(() => {
+  const notifications = useMemo(() => getStoredNotifications(), []);
+
+  const filteredLogs = useMemo(() => {
     if (!query) return AUDIT_LOGS;
     const q = query.toLowerCase();
     return AUDIT_LOGS.filter(l =>
@@ -382,61 +390,170 @@ const AuditTab = () => {
     );
   }, [query]);
 
+  const filteredNotifs = useMemo(() => {
+    if (!query) return notifications;
+    const q = query.toLowerCase();
+    return notifications.filter(n =>
+      n.patientName.toLowerCase().includes(q) ||
+      n.patientId.toLowerCase().includes(q) ||
+      n.recipient.toLowerCase().includes(q) ||
+      (n.carrier && n.carrier.toLowerCase().includes(q))
+    );
+  }, [query, notifications]);
+
   const blocked  = AUDIT_LOGS.filter(l => l.status === 'BLOCKED').length;
   const warnings = AUDIT_LOGS.filter(l => l.status === 'WARNING').length;
 
+  const smsCount = notifications.filter(n => n.type === 'SMS').length;
+  const emailCount = notifications.filter(n => n.type === 'EMAIL').length;
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label:'Total Events',     val:AUDIT_LOGS.length, color:'text-health-blue', bg:'bg-blue-50' },
-          { label:'Blocked Attempts', val:blocked,           color:'text-red-700',     bg:'bg-red-50'  },
-          { label:'Warnings',         val:warnings,          color:'text-amber-700',   bg:'bg-amber-50'},
-        ].map(k => (
-          <div key={k.label} className={`${k.bg} rounded-xl p-4 border border-white shadow-sm`}>
-            <p className="text-xs font-bold text-neutral-500 uppercase">{k.label}</p>
-            <p className={`text-3xl font-black ${k.color}`}>{k.val}</p>
-          </div>
-        ))}
+      {/* Sub-View Switcher Bar */}
+      <div className="flex border-b border-neutral-200 bg-white rounded-xl shadow-xs px-3 overflow-x-auto">
+        <button
+          onClick={() => { setSubView('access'); setQuery(''); }}
+          className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-colors ${
+            subView === 'access'
+              ? 'border-health-blue text-health-blue'
+              : 'border-transparent text-neutral-500 hover:text-neutral-800'
+          }`}
+        >
+          <ShieldCheck className="h-4 w-4" />
+          <span>System Access & CRUD Audit Logs ({AUDIT_LOGS.length})</span>
+        </button>
+        <button
+          onClick={() => { setSubView('notifications'); setQuery(''); }}
+          className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-colors ${
+            subView === 'notifications'
+              ? 'border-health-blue text-health-blue'
+              : 'border-transparent text-neutral-500 hover:text-neutral-800'
+          }`}
+        >
+          <Smartphone className="h-4 w-4" />
+          <span>Outbound Patient Onboarding Logs (SMS & Email)</span>
+          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+            {notifications.length}
+          </span>
+        </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-neutral-200 bg-neutral-50 flex gap-3 items-center">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-neutral-400" />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search logs…"
-              className="pl-8 pr-4 py-2 border border-neutral-200 rounded-lg text-sm outline-none w-full" />
+      {subView === 'access' ? (
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label:'Total Events',     val:AUDIT_LOGS.length, color:'text-health-blue', bg:'bg-blue-50' },
+              { label:'Blocked Attempts', val:blocked,           color:'text-red-700',     bg:'bg-red-50'  },
+              { label:'Warnings',         val:warnings,          color:'text-amber-700',   bg:'bg-amber-50'},
+            ].map(k => (
+              <div key={k.label} className={`${k.bg} rounded-xl p-4 border border-white shadow-sm`}>
+                <p className="text-xs font-bold text-neutral-500 uppercase">{k.label}</p>
+                <p className={`text-3xl font-black ${k.color}`}>{k.val}</p>
+              </div>
+            ))}
           </div>
-          <button onClick={() => (window as any).showToast('Audit log exported to CSV.')}
-            className="border border-neutral-200 text-sm text-neutral-600 px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-neutral-50">
-            <Download className="h-4 w-4" /> Export
-          </button>
-          <span className="text-xs text-neutral-400 ml-auto">{filtered.length} of {AUDIT_LOGS.length} events</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-100">
-            <thead className="bg-white">
-              <tr>{['Timestamp','User','Role','County','Action','Resource','Status','IP Address'].map(h => (
-                <th key={h} className="px-4 py-2.5 text-left text-xs font-bold text-neutral-500 uppercase">{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {filtered.map((l, i) => (
-                <tr key={i} className="hover:bg-neutral-50 transition-colors">
-                  <td className="px-4 py-3 text-xs text-neutral-500 font-mono whitespace-nowrap">{l.timestamp}</td>
-                  <td className="px-4 py-3 text-xs font-bold text-neutral-700">{l.user}</td>
-                  <td className="px-4 py-3 text-xs text-neutral-500">{l.role}</td>
-                  <td className="px-4 py-3 text-xs text-neutral-500">{l.county}</td>
-                  <td className="px-4 py-3"><span className="text-xs bg-neutral-100 px-2 py-0.5 rounded font-bold text-neutral-600">{l.action}</span></td>
-                  <td className="px-4 py-3 text-xs text-neutral-600 max-w-xs truncate">{l.resource}</td>
-                  <td className="px-4 py-3"><Pill label={l.status} color={statusColor[l.status]} /></td>
-                  <td className="px-4 py-3 text-xs font-mono text-neutral-400">{l.ipAddress}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-neutral-200 bg-neutral-50 flex gap-3 items-center">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-neutral-400" />
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search logs…"
+                  className="pl-8 pr-4 py-2 border border-neutral-200 rounded-lg text-sm outline-none w-full" />
+              </div>
+              <button onClick={() => (window as any).showToast('Audit log exported to CSV.')}
+                className="border border-neutral-200 text-sm text-neutral-600 px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-neutral-50">
+                <Download className="h-4 w-4" /> Export
+              </button>
+              <span className="text-xs text-neutral-400 ml-auto">{filteredLogs.length} of {AUDIT_LOGS.length} events</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-neutral-100">
+                <thead className="bg-white">
+                  <tr>{['Timestamp','User','Role','County','Action','Resource','Status','IP Address'].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left text-xs font-bold text-neutral-500 uppercase">{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {filteredLogs.map((l, i) => (
+                    <tr key={i} className="hover:bg-neutral-50 transition-colors">
+                      <td className="px-4 py-3 text-xs text-neutral-500 font-mono whitespace-nowrap">{l.timestamp}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-neutral-700">{l.user}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">{l.role}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">{l.county}</td>
+                      <td className="px-4 py-3"><span className="text-xs bg-neutral-100 px-2 py-0.5 rounded font-bold text-neutral-600">{l.action}</span></td>
+                      <td className="px-4 py-3 text-xs text-neutral-600 max-w-xs truncate">{l.resource}</td>
+                      <td className="px-4 py-3"><Pill label={l.status} color={statusColor[l.status]} /></td>
+                      <td className="px-4 py-3 text-xs font-mono text-neutral-400">{l.ipAddress}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* Outbound Notification Dispatch Logs */
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label:'Total Dispatches',     val:notifications.length, color:'text-health-blue', bg:'bg-blue-50' },
+              { label:'SMS (GSM Gateways)',    val:smsCount,             color:'text-emerald-700', bg:'bg-emerald-50' },
+              { label:'MoH Welcome Emails',   val:emailCount,           color:'text-purple-700',  bg:'bg-purple-50'},
+            ].map(k => (
+              <div key={k.label} className={`${k.bg} rounded-xl p-4 border border-white shadow-sm`}>
+                <p className="text-xs font-bold text-neutral-500 uppercase">{k.label}</p>
+                <p className={`text-3xl font-black ${k.color}`}>{k.val}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-neutral-200 bg-neutral-50 flex gap-3 items-center">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-neutral-400" />
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search recipient, name, or TB ID…"
+                  className="pl-8 pr-4 py-2 border border-neutral-200 rounded-lg text-sm outline-none w-full" />
+              </div>
+              <button onClick={() => (window as any).showToast('Notification logs exported to CSV.')}
+                className="border border-neutral-200 text-sm text-neutral-600 px-3 py-2 rounded-lg flex items-center gap-1.5 hover:bg-neutral-50">
+                <Download className="h-4 w-4" /> Export
+              </button>
+              <span className="text-xs text-neutral-400 ml-auto">{filteredNotifs.length} dispatches</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-neutral-100">
+                <thead className="bg-white">
+                  <tr>{['Dispatch Time','Patient ID','Patient Name','Channel','Carrier / Relay','Recipient','PIN','Status','Message Content'].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left text-xs font-bold text-neutral-500 uppercase">{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {filteredNotifs.map((n) => (
+                    <tr key={n.id} className="hover:bg-neutral-50 transition-colors">
+                      <td className="px-4 py-3 text-xs text-neutral-500 font-mono whitespace-nowrap">{n.timestamp}</td>
+                      <td className="px-4 py-3 text-xs font-mono font-bold text-health-blue">{n.patientId}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-neutral-800 whitespace-nowrap">{n.patientName}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded font-bold flex items-center gap-1 w-fit ${
+                          n.type === 'SMS' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {n.type === 'SMS' ? <Smartphone className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
+                          {n.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-neutral-600 whitespace-nowrap">{n.carrier || 'GSM Gateway'}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-neutral-700 whitespace-nowrap">{n.recipient}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-amber-700 text-xs">{n.temporaryPin}</td>
+                      <td className="px-4 py-3"><Pill label={n.status} color={statusColor[n.status]} /></td>
+                      <td className="px-4 py-3 text-xs text-neutral-600 max-w-xs truncate" title={n.message}>{n.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

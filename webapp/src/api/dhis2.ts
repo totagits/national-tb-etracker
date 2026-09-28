@@ -85,10 +85,100 @@ export interface PatientRecord {
   triagePulse?: number;
   triageSpo2?: number;
   reasonNoAddress?: string;
+
+  // Patient Self-Care Portal & Notification Onboarding fields
+  email?: string;
+  temporaryPin?: string;
+  isActivated?: boolean;
+  password?: string;
+  recoveryPhone?: string;
+  preferredLanguage?: 'Standard English' | 'Liberian English / Koloqua';
+  lastDoseConfirmedAt?: string;
+  adherenceStreakDays?: number;
+  reportedSideEffects?: string[];
+  lastNotifiedDate?: string;
+}
+
+export interface OutboundNotification {
+  id: string;
+  patientId: string;
+  patientName: string;
+  type: 'SMS' | 'EMAIL';
+  recipient: string;
+  carrier?: 'Orange Liberia' | 'Lonestar Cell MTN' | 'MoH Mail Relay';
+  subject?: string;
+  message: string;
+  temporaryPin: string;
+  status: 'Delivered' | 'Sent' | 'Queued' | 'Failed';
+  timestamp: string;
+  portalUrl?: string;
 }
 
 const CONFIG_STORAGE_KEY = 'tb_etracker_dhis2_config';
 const PATIENTS_STORAGE_KEY = 'tb_etracker_patients_data';
+const NOTIFICATIONS_STORAGE_KEY = 'tb_etracker_outbound_notifications';
+
+export const INITIAL_NOTIFICATIONS: OutboundNotification[] = [
+  {
+    id: 'NOTIF-901',
+    patientId: 'TB-1042',
+    patientName: 'John Doe',
+    type: 'SMS',
+    recipient: '+231-77-512-3401',
+    carrier: 'Lonestar Cell MTN',
+    message: 'MoH Liberia NLTCP: Welcome John! You are enrolled in the National TB e-Tracker (ID: TB-1042). Temp Portal PIN: 4892. Log in at https://totagits.github.io/national-tb-etracker/ to activate your care account. For help, call toll-free 4455.',
+    temporaryPin: '4892',
+    status: 'Delivered',
+    timestamp: '2026-05-15 08:31:14'
+  },
+  {
+    id: 'NOTIF-902',
+    patientId: 'TB-1042',
+    patientName: 'John Doe',
+    type: 'EMAIL',
+    recipient: 'john.doe@gmail.com',
+    carrier: 'MoH Mail Relay',
+    subject: 'Ministry of Health Liberia: National TB e-Tracker Enrollment & Account Activation',
+    message: 'Welcome to the National TB e-Tracker platform. Your patient profile TB-1042 has been created at JFK Medical Center. Please activate your My TB Care portal using temporary PIN: 4892.',
+    temporaryPin: '4892',
+    status: 'Delivered',
+    timestamp: '2026-05-15 08:31:16',
+    portalUrl: 'https://totagits.github.io/national-tb-etracker/'
+  },
+  {
+    id: 'NOTIF-903',
+    patientId: 'TB-1043',
+    patientName: 'Jane Smith',
+    type: 'SMS',
+    recipient: '+231-77-622-4911',
+    carrier: 'Lonestar Cell MTN',
+    message: 'MoH Liberia NLTCP: Welcome Jane! You are enrolled in the National TB e-Tracker (ID: TB-1043). Temp Portal PIN: 7120. Log in to activate your care account. Helpdesk: 4455.',
+    temporaryPin: '7120',
+    status: 'Delivered',
+    timestamp: '2026-05-16 11:04:22'
+  }
+];
+
+export const getStoredNotifications = (): OutboundNotification[] => {
+  try {
+    const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fallback
+  }
+  return INITIAL_NOTIFICATIONS;
+};
+
+export const saveOutboundNotification = (notif: OutboundNotification): OutboundNotification[] => {
+  const current = getStoredNotifications();
+  const list = [notif, ...current];
+  try {
+    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('Failed to save notification', e);
+  }
+  return list;
+};
 
 export const INITIAL_DEMO_PATIENTS: PatientRecord[] = [
   {

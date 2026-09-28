@@ -16,10 +16,13 @@ import { DHIS2ConnectionModal } from './components/DHIS2ConnectionModal';
 import { LongitudinalTimelineModal } from './components/LongitudinalTimelineModal';
 import { GeospatialTracingMap } from './components/GeospatialTracingMap';
 import { CohortAnalysisDashboard } from './components/CohortAnalysisDashboard';
+import { MandatoryPasswordGate } from './components/MandatoryPasswordGate';
+import { PatientCarePortal } from './components/PatientCarePortal';
 import {
   getDHIS2Config,
   getStoredPatients,
   savePatientRecord,
+  updatePatientRecord,
   pushPatientToDHIS2,
   type DHIS2Config,
   type PatientRecord
@@ -542,6 +545,7 @@ const DefaulterListPanel = () => {
 const allRoles = [
   { id: 'national_admin', name: 'MoH National System Admin', group: 'Clinical Platform' },
   { id: 'facility_clerk', name: 'MoH Facility Data Clerk', group: 'Clinical Platform' },
+  { id: 'patient', name: 'Patient Self-Care & Adherence Portal (My TB Care)', group: 'Patient & Community' },
   { id: 'director', name: 'Project Director', group: 'Implementation Team' },
   { id: 'manager', name: 'Project Manager', group: 'Implementation Team' },
   { id: 'dhis2', name: 'DHIS2 Config Specialist', group: 'Implementation Team' },
@@ -564,6 +568,10 @@ function App() {
   const [dhis2Config, setDhis2Config] = useState<DHIS2Config>(getDHIS2Config);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [patients, setPatients] = useState<PatientRecord[]>(getStoredPatients);
+  const [activePatient, setActivePatient] = useState<PatientRecord>(() => {
+    const list = getStoredPatients();
+    return list[0];
+  });
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
   const [selectedTimelinePatient, setSelectedTimelinePatient] = useState<PatientRecord | null>(null);
   // Access code gate
@@ -640,6 +648,13 @@ function App() {
           { id: 'search', icon: Users, label: 'Facility Patients' },
           { id: 'geospatial', icon: MapPin, label: 'Community Geolocation' },
           { id: 'defaulters', icon: AlertTriangle, label: 'Defaulter List' }
+        ];
+      case 'patient':
+        return [
+          { id: 'my_care', icon: HeartPulse, label: 'My Daily Care & Digital DOTS' },
+          { id: 'lab_results', icon: Stethoscope, label: 'Lab & Sputum Tests' },
+          { id: 'messages', icon: MessageSquare, label: 'MoH Care Team Messages' },
+          { id: 'security_settings', icon: ShieldCheck, label: 'Account Security & PIN' }
         ];
       case 'director': 
         return [
@@ -744,7 +759,46 @@ function App() {
     }
 
     if (activeTab === 'registration') {
-      return <RegistrationWizard facilities={facilities} onRegister={handleRegisterPatient} />;
+      return (
+        <RegistrationWizard
+          facilities={facilities}
+          onRegister={handleRegisterPatient}
+          onTestPatientPortal={(newPatient) => {
+            setActivePatient(newPatient);
+            setSelectedRoleId('patient');
+            setActiveTab('my_care');
+          }}
+        />
+      );
+    }
+
+    // Patient Self-Care Portal & Mandatory Security Gate
+    if (selectedRoleId === 'patient' || ['my_care', 'lab_results', 'messages', 'security_settings'].includes(activeTab)) {
+      if (!activePatient?.isActivated) {
+        return (
+          <MandatoryPasswordGate
+            patient={activePatient}
+            onActivated={(updated) => {
+              const list = updatePatientRecord(updated);
+              setPatients(list);
+              setActivePatient(updated);
+            }}
+            onCancel={() => setSelectedRoleId('national_admin')}
+          />
+        );
+      }
+      return (
+        <PatientCarePortal
+          currentPatient={activePatient}
+          allPatients={patients}
+          onUpdatePatient={(updated) => {
+            const list = updatePatientRecord(updated);
+            setPatients(list);
+            setActivePatient(updated);
+          }}
+          onSwitchPatient={(p) => setActivePatient(p)}
+        />
+      );
     }
 
     if (activeTab === 'search') {
@@ -1204,6 +1258,11 @@ function App() {
                 >
                   <optgroup label="Clinical Users (MoH)">
                     {allRoles.filter(r => r.group === 'Clinical Platform').map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Patient & Community Health">
+                    {allRoles.filter(r => r.group === 'Patient & Community').map(r => (
                       <option key={r.id} value={r.id}>{r.name}</option>
                     ))}
                   </optgroup>
